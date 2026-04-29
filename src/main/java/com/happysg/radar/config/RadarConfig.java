@@ -7,11 +7,11 @@ import net.createmod.catnip.config.ConfigBase;
 import net.createmod.catnip.config.ui.BaseConfigScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.EnumMap;
@@ -40,7 +40,7 @@ public class RadarConfig {
     }
 
     private static <T extends ConfigBase> T register(Supplier<T> factory, ModConfig.Type side) {
-        Pair<T, ForgeConfigSpec> specPair = new ForgeConfigSpec.Builder().configure(builder -> {
+        Pair<T, ModConfigSpec> specPair = new ModConfigSpec.Builder().configure(builder -> {
             T config = factory.get();
             config.registerAll(builder);
             return config;
@@ -52,12 +52,12 @@ public class RadarConfig {
         return config;
     }
 
-    public static void register(ModLoadingContext context) {
+    public static void register(ModContainer container) {
         client = register(RadarClientConfig::new, ModConfig.Type.CLIENT);
         server = register(RadarServerConfig::new, ModConfig.Type.SERVER);
 
         for (Map.Entry<ModConfig.Type, ConfigBase> pair : CONFIGS.entrySet())
-            context.registerConfig(pair.getKey(), pair.getValue().specification);
+            container.registerConfig(pair.getKey(), pair.getValue().specification);
     }
 
     @SubscribeEvent

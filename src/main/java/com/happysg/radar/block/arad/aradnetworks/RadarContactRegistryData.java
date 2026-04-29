@@ -1,6 +1,7 @@
 package com.happysg.radar.block.arad.aradnetworks;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
@@ -19,8 +20,7 @@ public class RadarContactRegistryData extends SavedData {
 
     public static RadarContactRegistryData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                RadarContactRegistryData::load,
-                RadarContactRegistryData::new,
+                new Factory<>(RadarContactRegistryData::new, RadarContactRegistryData::load),
                 "create_radar_contact_registry"
         );
     }
@@ -186,8 +186,12 @@ public class RadarContactRegistryData extends SavedData {
         return data;
     }
 
+    public static RadarContactRegistryData load(CompoundTag tag, HolderLookup.Provider provider) {
+        return load(tag);
+    }
+
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
         CompoundTag shipsTag = new CompoundTag();
 
         for (var e : entries.entrySet()) {

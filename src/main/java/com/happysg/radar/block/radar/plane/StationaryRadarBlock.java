@@ -1,8 +1,8 @@
 package com.happysg.radar.block.radar.plane;
 
-import com.happysg.radar.compat.vs2.VS2CompatRegister;
 import com.happysg.radar.registry.ModBlockEntityTypes;
 import com.simibubi.create.foundation.block.IBE;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Block;
@@ -12,6 +12,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 
 public class StationaryRadarBlock extends HorizontalDirectionalBlock implements IBE<StationaryRadarBlockEntity> {
+    public static final MapCodec<StationaryRadarBlock> CODEC = simpleCodec(StationaryRadarBlock::new);
+
+    @Override
+    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
+        return CODEC;
+    }
 
     public StationaryRadarBlock(Properties pProperties) {
         super(pProperties);
@@ -38,6 +44,6 @@ public class StationaryRadarBlock extends HorizontalDirectionalBlock implements 
 
     @Override
     public BlockEntityType<? extends StationaryRadarBlockEntity> getBlockEntityType() {
-        return VS2CompatRegister.STATIONARY_RADAR_BE.get();
+        return ModBlockEntityTypes.STATIONARY_RADAR_BE.get();
     }
 }

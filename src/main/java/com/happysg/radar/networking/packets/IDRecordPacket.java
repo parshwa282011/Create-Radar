@@ -2,17 +2,9 @@ package com.happysg.radar.networking.packets;
 
 import com.happysg.radar.block.controller.id.IDManager;
 import com.mojang.logging.LogUtils;
-import com.simibubi.create.foundation.networking.SimplePacketBase;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-import org.valkyrienskies.core.api.ships.Ship;
-import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
-public class IDRecordPacket extends SimplePacketBase {
+public class IDRecordPacket {
     long shipId;
     String shipSlug;
     String secretID;
@@ -32,7 +24,6 @@ public class IDRecordPacket extends SimplePacketBase {
         this.newSlug = buffer.readUtf(32767);
     }
 
-    @Override
     public void write(FriendlyByteBuf buffer) {
         buffer.writeLong(shipId);
         buffer.writeUtf(shipSlug, 32767);
@@ -40,11 +31,7 @@ public class IDRecordPacket extends SimplePacketBase {
         buffer.writeUtf(newSlug, 32767);
     }
 
-    @Override
-    public boolean handle(NetworkEvent.Context context) {
-        context.enqueueWork(() -> {
-            IDManager.addIDRecord(shipId, secretID, newSlug);
-        });
+    public boolean handle(Object ignored) {
         return true;
     }
 }

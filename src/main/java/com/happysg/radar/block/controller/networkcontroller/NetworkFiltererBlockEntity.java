@@ -1,6 +1,5 @@
 package com.happysg.radar.block.controller.networkcontroller;
 
-import com.happysg.radar.block.arad.aradnetworks.RadarContactRegistry;
 import com.happysg.radar.block.behavior.networks.NetworkData;
 import com.happysg.radar.block.behavior.networks.WeaponFiringControl;
 import com.happysg.radar.block.behavior.networks.WeaponNetworkData;
@@ -11,11 +10,8 @@ import com.happysg.radar.block.behavior.networks.config.TargetingConfig;
 import com.happysg.radar.block.controller.pitch.AutoPitchControllerBlockEntity;
 import com.happysg.radar.block.radar.behavior.RadarScanningBlockBehavior;
 import com.happysg.radar.block.radar.track.RadarTrack;
-import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.vs2.PhysicsHandler;
 import com.happysg.radar.item.binos.Binoculars;
 import com.happysg.radar.block.radar.behavior.IRadar;
-import com.happysg.radar.block.radar.track.TrackCategory;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import com.mojang.logging.LogUtils;
@@ -35,16 +31,10 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import org.slf4j.Logger;
-import org.valkyrienskies.core.api.ships.Ship;
-import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 
@@ -64,9 +54,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
     private long suppressAutoUntilTick = 0L;
     private static final int MANUAL_CLEAR_COOLDOWN_TICKS = 20;
-
-    private long vsLoadedCacheUntilTick = -1;
-    private final Map<Long, Boolean> vsLoadedCache = new HashMap<>();
 
     private  TargetingConfig targeting = TargetingConfig.DEFAULT;
     private List<AABB> safeZones = new ArrayList<>();
@@ -95,50 +82,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
         String selectedId = data.getSelectedTargetId(group);
 
-        if (Mods.VALKYRIENSKIES.isLoaded() && selectedId != null && (sl.getGameTime() % 10 == 0)) {
-            long shipId = parseShipIdOrNeg(selectedId);
-            if (shipId != -1L) {
-                Ship ship = VSGameUtilsKt.getAllShips(level).getById(shipId);
-                if (ship != null) RadarContactRegistry.markLocked(sl, shipId, 10);
-            }
-        }
-
         if (sl.getGameTime() % 5 != 0) return;
         be.headlessTick(sl);
-    }
-
-    private boolean isVsShipStillLoaded(ServerLevel sl, @Nullable RadarTrack track) {
-        if (!Mods.VALKYRIENSKIES.isLoaded()) return true;
-        if (track == null) return true;
-        if (track.trackCategory() != TrackCategory.VS2) return true;
-
-        final long shipId;
-        try {
-            shipId = Long.parseLong(track.getId());
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
-
-        long now = sl.getGameTime();
-
-        // refresh cache
-        if (now > vsLoadedCacheUntilTick) {
-            vsLoadedCache.clear();
-            vsLoadedCacheUntilTick = now + 10;
-        }
-
-        Boolean cached = vsLoadedCache.get(shipId);
-        if (cached != null) return cached;
-
-        boolean loaded;
-        try {
-            loaded = VSGameUtilsKt.getShipObjectWorld(sl).getLoadedShips().getById(shipId) != null;
-        } catch (Throwable t) {
-            loaded = false;
-        }
-
-        vsLoadedCache.put(shipId, loaded);
-        return loaded;
     }
 
     private void headlessTick(ServerLevel sl) {
@@ -153,7 +98,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         if (!Objects.equals(netRadar, radarPosCache)) {
             radarPosCache = netRadar;
             radarCache = null;
-            vsLoadedCacheUntilTick = -1;
         }
 
         detectionCache = DetectionConfig.fromTag(group.detectionTag);
@@ -177,13 +121,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
         // resolve current selected track from group.selectedTargetId
         RadarTrack selected = resolveSelectedTrack(group.selectedTargetId);
-        if (selected != null && !isVsShipStillLoaded(sl, selected)) {
-            selectedWasAuto = false;
-
-            applySelectedTarget(sl, data, group, null, false);
-            selected = null;
-        }
-
         // If selection id exists but track isn't present anymore, clear it and stop.
         if (group.selectedTargetId != null && selected == null) {
             selectedWasAuto = false;
@@ -280,27 +217,9 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
     private void applySelectedTarget(ServerLevel sl, NetworkData data, NetworkData.Group group,
                                      @Nullable RadarTrack track, boolean wasAuto) {
-        String prev = data.getSelectedTargetId(group);
-
         this.selectedWasAuto = wasAuto;
 
         data.setSelectedTargetId(group, track == null ? null : track.getId());
-
-        if (Mods.VALKYRIENSKIES.isLoaded()) {
-            if (prev != null && track == null) {
-                long prevShipId = parseShipIdOrNeg(prev);
-                if (prevShipId != -1L) {
-                    RadarContactRegistry.unLock(sl, prevShipId);
-                }
-            }
-
-            if (track != null && track.trackCategory() == TrackCategory.VS2) {
-                long shipId = parseShipIdOrNeg(track.getId());
-                if (shipId != -1L) {
-                    RadarContactRegistry.markLocked(sl, shipId, 10);
-                }
-            }
-        }
 
         activeTrackCache = track;
         pushToEndpoints(track);
@@ -310,9 +229,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
     private double distSqFromFilterer(Vec3 pos) {
         Vec3 filtererPos = worldPosition.getCenter();
-        if (Mods.VALKYRIENSKIES.isLoaded() && level != null && PhysicsHandler.isBlockInShipyard(level, worldPosition)) {
-            filtererPos = PhysicsHandler.getWorldVec(level, filtererPos);
-        }
         return filtererPos.distanceToSqr(pos);
     }
 
@@ -389,8 +305,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         }
     };
 
-    private LazyOptional<IItemHandler> handler = LazyOptional.of(() -> inventory);
-
     private final CompoundTag[] slotNbt = new CompoundTag[3];
 
     public NetworkFiltererBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
@@ -454,10 +368,10 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         if (slot < 0 || slot >= inventory.getSlots()) return;
 
         ItemStack s = inventory.getStackInSlot(slot);
-        if (s == null || s.isEmpty() || !s.hasTag()) {
+        if (s == null || s.isEmpty() || !com.happysg.radar.utils.NbtCompat.hasTag(s)) {
             slotNbt[slot] = null;
         } else {
-            CompoundTag tag = s.getTag();
+            CompoundTag tag = com.happysg.radar.utils.NbtCompat.getTag(s);
             slotNbt[slot] = tag == null ? null : tag.copy();
         }
     }
@@ -547,7 +461,7 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 //        }
 //
 //        // VS2 → transponder / name via IDManager
-//        if (track.trackCategory() == TrackCategory.VS2) {
+//        if (track.trackCategory() == TrackCategory.AERONAUTICS) {
 //            try {
 //                long shipId = Long.parseLong(track.getId());
 //                var rec = com.happysg.radar.block.controller.id.IDManager.getIDRecordByShipId(shipId);
@@ -583,8 +497,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
             if (track == null) continue;
 
             if (!cfg.test(track.trackCategory())) continue;
-            if (!isVsShipStillLoaded(sl, track)) continue;
-
             Vec3 pos = track.position();
             if (pos == null) continue;
 
@@ -641,18 +553,18 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt) {
-        super.saveAdditional(nbt);
-        nbt.put(NBT_INVENTORY, inventory.serializeNBT());
+    protected void saveAdditional(CompoundTag nbt, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(nbt, registries);
+        nbt.put(NBT_INVENTORY, inventory.serializeNBT(registries));
         saveSlotNbt(nbt);
         nbt.putLong("LastKnownPos", lastKnownPos.asLong());
     }
 
 
-    protected void write(CompoundTag tag, boolean clientPacket) {
+    protected void write(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         tag.putLong("LastKnownPos", lastKnownPos.asLong());
     }
-    protected void read(CompoundTag tag, boolean clientPacket) {
+    protected void read(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         if (tag.contains("LastKnownPos", Tag.TAG_LONG)) {
             lastKnownPos = BlockPos.of(tag.getLong("LastKnownPos"));
         } else {
@@ -661,13 +573,13 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag nbt) {
-        super.load(nbt);
+    protected void loadAdditional(CompoundTag nbt, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(nbt, registries);
 
         if (nbt.contains(NBT_INVENTORY, Tag.TAG_COMPOUND)) {
-            inventory.deserializeNBT(nbt.getCompound(NBT_INVENTORY));
+            inventory.deserializeNBT(registries, nbt.getCompound(NBT_INVENTORY));
         } else if (nbt.contains(LEGACY_INV, Tag.TAG_COMPOUND)) {
-            inventory.deserializeNBT(nbt.getCompound(LEGACY_INV));
+            inventory.deserializeNBT(registries, nbt.getCompound(LEGACY_INV));
         }
 
         if (nbt.contains(NBT_SLOT_NBT, Tag.TAG_LIST)) {
@@ -679,13 +591,12 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
             updateSlotNbtFromInventory(i);
         }
 
-        handler = LazyOptional.of(() -> inventory);
     }
 
     // Sync to client
     @Override
-    public CompoundTag getUpdateTag() {
-        return saveWithoutMetadata();
+    public CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
     }
 
     @Nullable
@@ -694,29 +605,14 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // Capabilities
-    @Nonnull
-    @Override
-    public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ITEM_HANDLER) return handler.cast();
-        return super.getCapability(cap, side);
-    }
-
     @Override
     public void onLoad() {
         super.onLoad();
-        handler = LazyOptional.of(() -> inventory);
         for (int i = 0; i < inventory.getSlots(); i++) updateSlotNbtFromInventory(i);
 
         if (level instanceof ServerLevel sl) {
             applyFiltersToNetwork();
         }
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        handler.invalidate();
     }
 
     public IItemHandler getItemHandler() {
@@ -776,8 +672,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
 
     private static IdentificationConfig readIdentificationFromItem(ItemStack stack) {
-        if (stack == null || stack.isEmpty() || !stack.hasTag()) return IdentificationConfig.DEFAULT;
-        CompoundTag root = stack.getTag();
+        if (stack == null || stack.isEmpty() || !com.happysg.radar.utils.NbtCompat.hasTag(stack)) return IdentificationConfig.DEFAULT;
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getTag(stack);
         if (root == null) return IdentificationConfig.DEFAULT;
 
         if (root.contains("Filters", Tag.TAG_COMPOUND)) {
@@ -830,8 +726,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
     @Nullable
     private static CompoundTag extractConfigCompound(ItemStack stack, String key) {
-        if (stack == null || stack.isEmpty() || !stack.hasTag()) return null;
-        CompoundTag root = stack.getTag();
+        if (stack == null || stack.isEmpty() || !com.happysg.radar.utils.NbtCompat.hasTag(stack)) return null;
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getTag(stack);
         if (root == null) return null;
 
         if (root.contains("Filters", Tag.TAG_COMPOUND)) {
@@ -845,24 +741,6 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         }
 
         return null;
-    }
-
-    private static boolean isNumericId(@Nullable String s) {
-        if (s == null || s.isEmpty()) return false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c < '0' || c > '9') return false;
-        }
-        return true;
-    }
-
-    private static long parseShipIdOrNeg(@Nullable String s) {
-        if (!isNumericId(s)) return -1L;
-        try {
-            return Long.parseLong(s);
-        } catch (NumberFormatException e) {
-            return -1L;
-        }
     }
 
     private void dropOrReselectAuto(ServerLevel sl, NetworkData data, NetworkData.Group group) {

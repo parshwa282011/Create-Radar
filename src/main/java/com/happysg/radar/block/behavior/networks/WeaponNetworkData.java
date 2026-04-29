@@ -2,6 +2,7 @@ package com.happysg.radar.block.behavior.networks;
 
 import com.happysg.radar.block.behavior.networks.config.TargetingConfig;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -134,8 +135,7 @@ public class WeaponNetworkData extends SavedData {
 
     public static WeaponNetworkData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                WeaponNetworkData::load,
-                WeaponNetworkData::new,
+                new Factory<>(WeaponNetworkData::new, WeaponNetworkData::load),
                 "radar_mount_links"
         );
     }
@@ -153,15 +153,15 @@ public class WeaponNetworkData extends SavedData {
         for (int i = 0; i < groups.size(); i++) {
             CompoundTag g = groups.getCompound(i);
 
-            ResourceKey<Level> dim = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(g.getString("Dim")));
-            BlockPos mountPos = NbtUtils.readBlockPos(g.getCompound("MountPos"));
+            ResourceKey<Level> dim = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(g.getString("Dim")));
+            BlockPos mountPos = com.happysg.radar.utils.NbtCompat.readBlockPos(g.getCompound("MountPos"));
 
             String mountKey = key(dim, mountPos);
             Group group = new Group(new MountKey(dim, mountPos));
 
-            if (g.contains("YawPos", Tag.TAG_COMPOUND))   group.yawPos = NbtUtils.readBlockPos(g.getCompound("YawPos"));
-            if (g.contains("PitchPos", Tag.TAG_COMPOUND)) group.pitchPos = NbtUtils.readBlockPos(g.getCompound("PitchPos"));
-            if (g.contains("FiringPos", Tag.TAG_COMPOUND))group.firingPos = NbtUtils.readBlockPos(g.getCompound("FiringPos"));
+            if (g.contains("YawPos", Tag.TAG_COMPOUND))   group.yawPos = com.happysg.radar.utils.NbtCompat.readBlockPos(g.getCompound("YawPos"));
+            if (g.contains("PitchPos", Tag.TAG_COMPOUND)) group.pitchPos = com.happysg.radar.utils.NbtCompat.readBlockPos(g.getCompound("PitchPos"));
+            if (g.contains("FiringPos", Tag.TAG_COMPOUND))group.firingPos = com.happysg.radar.utils.NbtCompat.readBlockPos(g.getCompound("FiringPos"));
 
             // Targeting tag (optional)
             if (g.contains("Targeting", Tag.TAG_COMPOUND)) {
@@ -178,7 +178,7 @@ public class WeaponNetworkData extends SavedData {
             // Datalinks
             ListTag links = g.getList("DataLinks", Tag.TAG_COMPOUND);
             for (int j = 0; j < links.size(); j++) {
-                BlockPos lp = NbtUtils.readBlockPos(links.getCompound(j));
+                BlockPos lp = com.happysg.radar.utils.NbtCompat.readBlockPos(links.getCompound(j));
                 group.dataLinks.add(lp);
                 data.dataLinkToMount.put(key(dim, lp), mountKey);
             }
@@ -189,8 +189,12 @@ public class WeaponNetworkData extends SavedData {
         return data;
     }
 
+    public static WeaponNetworkData load(CompoundTag tag, HolderLookup.Provider provider) {
+        return load(tag);
+    }
+
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
         ListTag groups = new ListTag();
 
         for (Group group : groupsByMount.values()) {

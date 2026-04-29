@@ -3,15 +3,16 @@ package com.happysg.radar;
 import com.happysg.radar.block.controller.id.IDManager;
 import com.happysg.radar.block.datalink.DataLinkBlockItem;
 import com.happysg.radar.block.monitor.MonitorInputHandler;
+import com.happysg.radar.block.behavior.networks.WeaponGroupCoordinator;
+import com.happysg.radar.item.binos.BinocularHandler;
+import com.happysg.radar.item.binos.BinocularOverlay;
 import com.happysg.radar.compat.cbcwpf.CBCWPFCompatRegister;
 import com.happysg.radar.compat.computercraft.CCCompatRegister;
-import com.happysg.radar.compat.vs2.VS2CompatRegister;
 import com.happysg.radar.ponder.RadarPonderPlugin;
 import com.happysg.radar.registry.ModCommands;
 
 import com.happysg.radar.compat.Mods;
 import com.happysg.radar.compat.cbc.CBCCompatRegister;
-import com.happysg.radar.compat.cbcmw.CBCMWCompatRegister;
 
 import com.happysg.radar.config.RadarConfig;
 import com.happysg.radar.networking.ModMessages;
@@ -33,21 +34,19 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.LevelAccessor;
 
-import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -70,57 +69,51 @@ public class CreateRadar {
         ModCommands.register(event.getDispatcher());
     }
 
-    public CreateRadar() {
+    public CreateRadar(IEventBus modEventBus, ModContainer container) {
         getLogger().info("Initializing Create Radar!");
 
-        ModLoadingContext context = ModLoadingContext.get();
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(DataLinkBlockItem.class);
+        NeoForge.EVENT_BUS.register(WeaponGroupCoordinator.class);
+        NeoForge.EVENT_BUS.register(BinocularHandler.class);
+        NeoForge.EVENT_BUS.register(BinocularOverlay.class);
         REGISTRATE.registerEventListeners(modEventBus);
 
         ModItems.register();
         ModBlocks.register();
         ModBlockEntityTypes.register();
         ModCreativeTabs.register(modEventBus);
+        modEventBus.register(ModKeybinds.class);
         ModLang.register();
         ModPartials.init();
-        RadarConfig.register(context);
+        RadarConfig.register(container);
         NetworkHandler.register();
         modEventBus.addListener(CreateRadar::init);
         modEventBus.addListener(CreateRadar::clientInit);
         modEventBus.addListener(CreateRadar::onLoadComplete);
-        ModContainer container = ModList.get()
-                .getModContainerById(CreateRadar.MODID)
-                .orElseThrow(() -> new IllegalStateException("Radar mod container missing on LoadComplete"));
+        container.registerExtensionPoint(IConfigScreenFactory.class,
+                (IConfigScreenFactory) (modContainer, parent) -> RadarConfig.createConfigScreen(net.minecraft.client.Minecraft.getInstance(), parent));
 
-        container.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory(RadarConfig::createConfigScreen));
-
-        MinecraftForge.EVENT_BUS.addListener(CreateRadar::clientTick);
-        MinecraftForge.EVENT_BUS.addListener(CreateRadar::onLoadWorld);
+        NeoForge.EVENT_BUS.addListener(CreateRadar::clientTick);
+        NeoForge.EVENT_BUS.addListener(CreateRadar::onLoadWorld);
         ModSounds.register(modEventBus);
 
         // Compat modules
         if (Mods.CREATEBIGCANNONS.isLoaded())
             CBCCompatRegister.registerCBC();
-        if (Mods.CBCMODERNWARFARE.isLoaded())
-            CBCMWCompatRegister.registerCBCMW();
         if (Mods.COMPUTERCRAFT.isLoaded())
             CCCompatRegister.registerPeripherals();
         if (Mods.SHUPAPIUM.isLoaded())
             CBCWPFCompatRegister.registerCBCWPF();
-        if(Mods.VALKYRIENSKIES.isLoaded()){
-            VS2CompatRegister.registerVS2();
-        }
+        if (Mods.CREATE_AERONAUTICS.isLoaded())
+            getLogger().info("Create Aeronautics detected; using vanilla world-space radar tracking until its API is linked.");
 
     }
-    @SubscribeEvent
     public static void commonSetup(FMLCommonSetupEvent event) {
 
     }
 
-    private static void clientTick(TickEvent.ClientTickEvent event) {
+    private static void clientTick(ClientTickEvent.Post event) {
         DataLinkBlockItem.clientTick();
     }
 
@@ -129,7 +122,7 @@ public class CreateRadar {
     }
 
     public static ResourceLocation asResource(String path) {
-        return new ResourceLocation(MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(MODID, path);
     }
 
 
@@ -143,7 +136,7 @@ public class CreateRadar {
 
     public static void clientInit(final FMLClientSetupEvent event) {
         PonderIndex.addPlugin(new RadarPonderPlugin());
-        MinecraftForge.EVENT_BUS.addListener(MonitorInputHandler::monitorPlayerHovering);
+        NeoForge.EVENT_BUS.addListener(MonitorInputHandler::monitorPlayerHovering);
     }
 
 
@@ -161,8 +154,6 @@ public class CreateRadar {
     public static void init(final FMLCommonSetupEvent event) {
 
         event.enqueueWork(() -> {
-            // Must be registered after registries open
-            ModContraptionTypes.register();
             // Stress values
             BlockStressValues.IMPACTS.register(ModBlocks.RADAR_BEARING_BLOCK.get(), () -> 4d);
             BlockStressValues.IMPACTS.register(ModBlocks.AUTO_YAW_CONTROLLER_BLOCK.get(), () -> 64);

@@ -5,8 +5,7 @@ import com.happysg.radar.block.controller.id.IDManager;
 import com.happysg.radar.block.radar.behavior.IRadar;
 import com.happysg.radar.block.radar.track.RadarTrack;
 import com.happysg.radar.block.radar.track.TrackCategory;
-import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.vs2.PhysicsHandler;
+import com.happysg.radar.compat.aeronautics.PhysicsHandler;
 import com.happysg.radar.config.RadarConfig;
 import com.happysg.radar.registry.ModRenderTypes;
 import com.mojang.logging.LogUtils;
@@ -28,10 +27,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.joml.Quaterniond;
-import org.joml.Vector3d;
 import org.slf4j.Logger;
-import org.valkyrienskies.core.api.ships.Ship;
 
 import java.util.List;
 import java.util.UUID;
@@ -175,8 +171,8 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
     private void renderLine(VertexConsumer buffer, Matrix4f matrix, Matrix3f normal,
                             float x1, float y1, float z1, float x2, float y2, float z2,
                             float r, float g, float b, float alpha) {
-        buffer.vertex(matrix, x1, y1, z1).color(r, g, b, alpha).normal(normal, 0, 1, 0).endVertex();
-        buffer.vertex(matrix, x2, y2, z2).color(r, g, b, alpha).normal(normal, 0, 1, 0).endVertex();
+        buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, alpha);
+        buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, alpha);
     }
 
     /**
@@ -203,37 +199,33 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         float u2 = 0.5f * gridSpacing, v2 = 0.5f * gridSpacing;
         float u3 = -0.5f * gridSpacing, v3 = 0.5f * gridSpacing;
 
-        buffer.vertex(m, xmin, DEPTH_GRID, zmin)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
-                .uv(u0, v0)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmin, DEPTH_GRID, zmin)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
+                .setUv(u0, v0)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmax, DEPTH_GRID, zmin)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
-                .uv(u1, v1)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmax, DEPTH_GRID, zmin)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
+                .setUv(u1, v1)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmax, DEPTH_GRID, zmax)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
-                .uv(u2, v2)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmax, DEPTH_GRID, zmax)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
+                .setUv(u2, v2)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmin, DEPTH_GRID, zmax)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
-                .uv(u3, v3)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmin, DEPTH_GRID, zmax)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_GRID)
+                .setUv(u3, v3)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
     }
 
 
@@ -255,18 +247,6 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         Vec3 radarPos = PhysicsHandler.getWorldPos(monitor.getLevel(), radar.getWorldPos()).getCenter();
         Vec3 relativePos = track.position().subtract(radarPos);
 
-        // if we're rendering relative to the monitor, and the monitor is on a ship,
-        // rotate the relative vector into ship-local axes so the screen rotates with the ship
-        if (radar.renderRelativeToMonitor()) {
-            if(!Mods.VALKYRIENSKIES.isLoaded())return;
-            Ship ship = monitor.getShip();
-            if (ship != null) {
-                // i keep the cone "north-up" by counter-rotating track vectors by the ship yaw
-                double shipYawRad = getShipYawRad(ship);
-                relativePos = rotateAroundY(relativePos, -(shipYawRad + Math.PI));
-
-            }
-        }
         // Transform to display coordinates
         float xOff = calculateTrackOffset(relativePos, monitorFacing, scale, true);
         float zOff = calculateTrackOffset(relativePos, monitorFacing, scale, false);
@@ -344,41 +324,6 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         return new Vec3(x, v.y, z);
     }
 
-    /**
-     * i compute ship yaw only (around world Y) relative to world NORTH (-Z).
-     * result is radians, where 0 means ship forward points toward north ( -Z ).
-     */
-    private  double getShipYawRad(Ship ship) {
-        var transform = ship.getTransform();
-
-        Quaterniond shipToWorld = new Quaterniond();
-        try {
-            shipToWorld.set(transform.getShipToWorldRotation());
-        } catch (Throwable ignored) {
-            // if mappings differ, fall back to the inverse of worldToShip
-            shipToWorld.set(transform.getRotation()).invert();
-        }
-
-        // i ask: "where does the ship's local +Z (forward) point in the world?"
-        Vector3d fwd = new Vector3d(0, 0, 1);
-        shipToWorld.transform(fwd);
-
-        // yaw relative to north (-Z):
-        // when fwd is (0,0,-1) => atan2(0, 1) = 0 rad  (north)
-        // when fwd is (1,0,0)  => atan2(1, 0) = +pi/2 (east)
-        return Math.atan2(fwd.x, -fwd.z);
-    }
-    private  Vec3 rotateWorldVecIntoShipFrame(Ship ship, Vec3 worldVec) {
-        var transform = ship.getTransform();
-
-        Quaterniond worldToShip = new Quaterniond();
-        worldToShip.set(transform.getRotation());
-
-        Vector3d v = new Vector3d(worldVec.x, worldVec.y, worldVec.z);
-        worldToShip.transform(v);
-
-        return new Vec3(v.x, v.y, v.z);
-    }
 
 
     /**
@@ -458,37 +403,33 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         float g = color.getGreenAsFloat();
         float b = color.getBlueAsFloat();
 
-        buffer.vertex(m, xmin, depth, zmin)
-                .color(r, g, b, alpha)
-                .uv(u0, v0)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmin, depth, zmin)
+                .setColor(r, g, b, alpha)
+                .setUv(u0, v0)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmax, depth, zmin)
-                .color(r, g, b, alpha)
-                .uv(u1, v1)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmax, depth, zmin)
+                .setColor(r, g, b, alpha)
+                .setUv(u1, v1)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmax, depth, zmax)
-                .color(r, g, b, alpha)
-                .uv(u2, v2)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmax, depth, zmax)
+                .setColor(r, g, b, alpha)
+                .setUv(u2, v2)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, xmin, depth, zmax)
-                .color(r, g, b, alpha)
-                .uv(u3, v3)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, xmin, depth, zmax)
+                .setColor(r, g, b, alpha)
+                .setUv(u3, v3)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
     }
 
     /**
@@ -524,22 +465,8 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         Color color = new Color(RadarConfig.client().groundRadarColor.get());
 
         float monitorAngle = 0;
-        if (controller.getShip() != null && radar.getRadarType().equals("spinning")) { // spinning radar on a ship
-            // Calculate the current angle
-            Direction monitorFacing = controller.getBlockState().getValue(MonitorBlock.FACING);
-            Vec3 facingVec = new Vec3(monitorFacing.getStepX(), monitorFacing.getStepY(), monitorFacing.getStepZ());
-            Vec3 angleVec = PhysicsHandler.getWorldVecDirectionTransform(facingVec, controller);
-            monitorAngle = (float) Math.toDegrees(Math.atan2(angleVec.x, angleVec.z));
-
-            if (monitorFacing == Direction.NORTH || monitorFacing == Direction.SOUTH) {
-                monitorAngle = (monitorAngle + 180) % 360;
-            }
-
-            // Normalize to positive angles
-            monitorAngle = (monitorAngle + 360 + 180) % 360;
-        }
         float currentAngle;
-        if(radar.renderRelativeToMonitor() && controller.getShip() != null && !radar.getRadarType().equals("spinning")){  // plane radar on a ship
+        if(radar.renderRelativeToMonitor() && !radar.getRadarType().equals("spinning")){
             // Plane radar on ship - cone stays fixed, tracks rotate inside
             Direction monitorFacing = controller.getBlockState().getValue(MonitorBlock.FACING);
             Direction radarFacing   = radar.getradarDirection();
@@ -599,37 +526,33 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
         float v3 = centerY + (0 - centerX) * sin + (1 - centerY) * cos;
 
         // Render sweep quad
-        buffer.vertex(m, 1f - size, DEPTH_SWEEP, 1f - size)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
-                .uv(u0, v0)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, 1f - size, DEPTH_SWEEP, 1f - size)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
+                .setUv(u0, v0)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, 1, DEPTH_SWEEP, 1f - size)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
-                .uv(u1, v1)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, 1, DEPTH_SWEEP, 1f - size)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
+                .setUv(u1, v1)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, 1, DEPTH_SWEEP, 1f)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
-                .uv(u2, v2)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, 1, DEPTH_SWEEP, 1f)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
+                .setUv(u2, v2)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
 
-        buffer.vertex(m, 1f - size, DEPTH_SWEEP, 1f)
-                .color(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
-                .uv(u3, v3)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(255)
-                .normal(n, 0, 1, 0)
-                .endVertex();
+        buffer.addVertex(m, 1f - size, DEPTH_SWEEP, 1f)
+                .setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), ALPHA_SWEEP)
+                .setUv(u3, v3)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(255)
+                ;
     }
 
 
@@ -680,7 +603,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 return null;
             }
 
-            IDManager.IDRecord rec = IDManager.getIDRecordByShipId(shipId);
+            IDManager.IDRecord rec = IDManager.getIDRecordById(shipId);
             if (rec != null) {
                 String storedName = rec.name();
                 if (storedName != null && !storedName.isBlank())

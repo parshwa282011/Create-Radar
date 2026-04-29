@@ -29,9 +29,8 @@ import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.versions.forge.ForgeVersion;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.FMLPaths;
 
 import javax.annotation.Nullable;
 import java.awt.*;
@@ -570,7 +569,9 @@ public class  ModCommands {
         private static void addVersions(MinecraftServer server, List<String> out) {
             // i wrote this so i can verify minecraft/forge are exactly what i expect
             out.add("Minecraft: " + server.getServerVersion());
-            out.add("Forge: " + ForgeVersion.getVersion());
+            out.add("NeoForge: " + ModList.get().getModContainerById("neoforge")
+                    .map(container -> container.getModInfo().getVersion().toString())
+                    .orElse("unknown"));
             out.add("");
         }
 

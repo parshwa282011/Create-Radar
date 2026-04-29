@@ -7,37 +7,16 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.SpyglassItem;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
-@Mod.EventBusSubscriber(value = Dist.CLIENT, modid = CreateRadar.MODID)
 public class BinocularOverlay {
 
     private static final ResourceLocation OVERLAY = ModGuiTextures.BINOCULAR_OVERLAY.location;
 
     @SubscribeEvent
-    public static void onRenderOverlayPre(RenderGuiOverlayEvent.Pre event) {
-        Minecraft mc = Minecraft.getInstance();
-        Player player = mc.player;
-        if (player == null) return;
-
-
-        if (!player.isUsingItem()) return;
-        if (!(player.getUseItem().getItem() instanceof Binoculars)) return;
-
-        if (event.getOverlay().id().equals(VanillaGuiOverlay.SPYGLASS.id())) {
-            event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onRenderOverlayPost(RenderGuiOverlayEvent.Post event) {
-        if (!event.getOverlay().id().equals(VanillaGuiOverlay.VIGNETTE.id()))
-            return;
+    public static void onRenderOverlayPost(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null) return;
@@ -45,8 +24,8 @@ public class BinocularOverlay {
         if (!player.isUsingItem()) return;
         if (!(player.getUseItem().getItem() instanceof Binoculars)) return;
 
-        int screenW = event.getWindow().getGuiScaledWidth();
-        int screenH = event.getWindow().getGuiScaledHeight();
+        int screenW = mc.getWindow().getGuiScaledWidth();
+        int screenH = mc.getWindow().getGuiScaledHeight();
 
 
         final int TEX_W = 512;

@@ -1,10 +1,8 @@
 package com.happysg.radar.block.controller.id;
 
-import com.happysg.radar.compat.Mods;
 import com.simibubi.create.AllShapes;
 import com.simibubi.create.foundation.block.WrenchableDirectionalBlock;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -25,18 +23,11 @@ public class IdentificationTransponder extends WrenchableDirectionalBlock {
 
     @Override
     public @NotNull InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, @NotNull Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-        if (!Mods.VALKYRIENSKIES.isLoaded()) {
-            pPlayer.displayClientMessage(Component.translatable("create_radar.id_block.not_on_vs2"), true);
-            return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
-        }
-        return VS2IDHandler.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
+        return super.use(pState, pLevel, pPos, pPlayer, pHand, pHit);
     }
 
     @Override
     public void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState pNewState, boolean pMovedByPiston) {
-        if (Mods.VALKYRIENSKIES.isLoaded()) {
-            VS2IDHandler.onRemove(pState, pLevel, pPos, pNewState, pMovedByPiston);
-        }
         super.onRemove(pState, pLevel, pPos, pNewState, pMovedByPiston);
     }
     @Override

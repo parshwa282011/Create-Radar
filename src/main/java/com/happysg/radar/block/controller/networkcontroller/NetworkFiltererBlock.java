@@ -32,8 +32,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.items.IItemHandler;
+import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import org.jetbrains.annotations.Nullable;
@@ -83,7 +82,6 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
         return ModBlockEntityTypes.NETWORK_FILTER_BLOCK_ENTITY.get();
     }
 
-    @Override
     public @NotNull InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
             ItemStack held = player.getItemInHand(hand);
         if(held.is(ModItems.BINOCULARS.asItem())){
@@ -156,8 +154,7 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
             BlockEntity be = world.getBlockEntity(pos);
             if (!(be instanceof NetworkFiltererBlockEntity netFC)) return InteractionResult.PASS;
 
-            IItemHandler inv = netFC.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
-            if (inv == null) return InteractionResult.PASS;
+            IItemHandler inv = netFC.getItemHandler();
 
             // extract one item
             ItemStack extracted = inv.extractItem(clickedSlot, 1, false);
@@ -207,9 +204,7 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
                 return InteractionResult.PASS;
             }
 
-            IItemHandler inv = netFC.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
-
-            if (inv == null) return InteractionResult.PASS;
+            IItemHandler inv = netFC.getItemHandler();
 
 
             ItemStack toInsert = held.copy();
@@ -240,14 +235,15 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
                     }
 
                     // Drop any inventory contents (if present)
-                    be.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(handler -> {
+                    if (be instanceof NetworkFiltererBlockEntity filterer) {
+                        IItemHandler handler = filterer.getItemHandler();
                         for (int i = 0; i < handler.getSlots(); i++) {
                             ItemStack stack = handler.getStackInSlot(i);
                             if (!stack.isEmpty()) {
                                 Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack.copy());
                             }
                         }
-                    });
+                    }
                 }
             }
         }
@@ -272,8 +268,8 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
 
             // don't create a tag if it doesn't exist — use hasTag() / getTag()
             String nbtString;
-            if (s.hasTag()) {
-                CompoundTag tag = s.getTag(); // may be non-null if hasTag() true
+            if (com.happysg.radar.utils.NbtCompat.hasTag(s)) {
+                CompoundTag tag = com.happysg.radar.utils.NbtCompat.getTag(s); // may be non-null if hasTag() true
                 // raw NBT as a string; could be long
                 nbtString = tag == null ? "(null)" : tag.toString();
             } else {

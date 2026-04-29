@@ -110,7 +110,7 @@ public final class AutoTargetingHelper {
                     from, to,
                     ClipContext.Block.COLLIDER,
                     ClipContext.Fluid.NONE,
-                    null
+                    net.minecraft.world.phys.shapes.CollisionContext.empty()
             );
 
             HitResult hit = level.clip(ctx);
@@ -163,10 +163,10 @@ public final class AutoTargetingHelper {
         }
 
         // VS2 → transponder / name via IDManager
-        if (track.trackCategory() == TrackCategory.VS2) {
+        if (track.trackCategory() == TrackCategory.AERONAUTICS) {
             try {
                 long shipId = Long.parseLong(track.getId());
-                var rec = com.happysg.radar.block.controller.id.IDManager.getIDRecordByShipId(shipId);
+                var rec = com.happysg.radar.block.controller.id.IDManager.getIDRecordById(shipId);
                 if (rec == null) return false;
 
                 String key = (rec.secretID() != null && !rec.secretID().isBlank())
@@ -207,7 +207,7 @@ public final class AutoTargetingHelper {
 //        }
 //
 //        // VS2 → secretID (transponder)
-//        if (track.trackCategory() == TrackCategory.VS2) {
+//        if (track.trackCategory() == TrackCategory.AERONAUTICS) {
 //            IDManager.IDRecord rec = IDManager.getIDRecordByShipId(Long.parseLong(track.id()));
 //            if (rec == null) return null;
 //

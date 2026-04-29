@@ -9,23 +9,23 @@ import net.minecraft.world.entity.EntityType;
 public class RadarEntityTypeTags {
 
 //    public static final TagKey<EntityType<?>> RADAR_PLAYER =
-//            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_player"));
+//            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_player"));
 
     public static final TagKey<EntityType<?>> RADAR_HOSTILE =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_hostile"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_hostile"));
 
     public static final TagKey<EntityType<?>> RADAR_ANIMAL =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_animal"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_animal"));
 
     public static final TagKey<EntityType<?>> RADAR_MOB =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_mob"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_mob"));
 
     public static final TagKey<EntityType<?>> RADAR_PROJECTILE =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_projectile"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_projectile"));
 
 
     public static final TagKey<EntityType<?>> RADAR_ITEM =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(CreateRadar.MODID, "radar_item"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(CreateRadar.MODID, "radar_item"));
 
     private RadarEntityTypeTags() {
     }

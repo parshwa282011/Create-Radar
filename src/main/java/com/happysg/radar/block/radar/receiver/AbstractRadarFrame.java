@@ -48,7 +48,6 @@ public class AbstractRadarFrame extends WrenchableDirectionalBlock {
     }
 
     @SuppressWarnings("deprecation")
-    @Override
     @ParametersAreNonnullByDefault
     public @NotNull InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
         ItemStack heldItem = pPlayer.getItemInHand(pHand);

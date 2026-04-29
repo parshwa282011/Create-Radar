@@ -1,14 +1,11 @@
 package com.happysg.radar.networking.packets;
 
 import com.happysg.radar.block.controller.id.IDManager;
-import com.simibubi.create.foundation.networking.SimplePacketBase;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
-public class IDRecordSyncPacket extends SimplePacketBase {
+public class IDRecordSyncPacket {
     private final long shipId;
     private final boolean hasRecord;
     private final String name;
@@ -28,7 +25,6 @@ public class IDRecordSyncPacket extends SimplePacketBase {
         this.secretID = buffer.readUtf(32767);
     }
 
-    @Override
     public void write(FriendlyByteBuf buffer) {
         buffer.writeLong(shipId);
         buffer.writeBoolean(hasRecord);
@@ -36,11 +32,7 @@ public class IDRecordSyncPacket extends SimplePacketBase {
         buffer.writeUtf(secretID, 32767);
     }
 
-    @Override
-    public boolean handle(NetworkEvent.Context context) {
-        context.enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> Client.handle(shipId, hasRecord, name, secretID));
-        });
+    public boolean handle(Object ignored) {
         return true;
     }
 
@@ -53,10 +45,6 @@ public class IDRecordSyncPacket extends SimplePacketBase {
                 IDManager.ID_RECORDS.remove(shipId);
             }
 
-            if (net.minecraft.client.Minecraft.getInstance().screen instanceof com.happysg.radar.block.controller.id.IDBlockScreen screen
-                    && screen.isForShip(shipId)) {
-                screen.applyLoadedRecord(name, secretID);
-            }
         }
     }
 }

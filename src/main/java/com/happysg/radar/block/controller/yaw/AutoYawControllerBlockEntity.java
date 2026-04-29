@@ -16,11 +16,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3d;
-import org.valkyrienskies.core.api.ships.Ship;
-import org.valkyrienskies.mod.common.VSGameUtilsKt;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlockEntity;
-import org.valkyrienskies.clockwork.content.contraptions.phys.bearing.PhysBearingBlockEntity;
 
 import javax.annotation.Nullable;
 
@@ -46,12 +42,10 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
     private boolean mountDirty = true;
 
     private final CannonMountYaw cannonHandler;
-    private final PhysBearingYaw physHandler;
 
     public AutoYawControllerBlockEntity(BlockEntityType<?> typeIn, BlockPos pos, BlockState state) {
         super(typeIn, pos, state);
         this.cannonHandler = new CannonMountYaw(this);
-        this.physHandler = new PhysBearingYaw(this);
     }
 
     @Override
@@ -66,11 +60,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
         if (mount != null) {
             if (mount.kind == MountKind.CBC && Mods.CREATEBIGCANNONS.isLoaded()) {
                 cannonHandler.tick(mount.cbc);
-            } else if (mount.kind == MountKind.PHYS && Mods.VS_CLOCKWORK.isLoaded()) {
-                if (level.getGameTime() % 20 == 5) {
-                    physHandler.maybeUpdateYawZeroFromCannonInitialOrientation();
-                }
-                physHandler.tick(mount.phys);
             }
         }
 
@@ -121,9 +110,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
             return;
         }
 
-        if (mount.kind == MountKind.PHYS && Mods.VS_CLOCKWORK.isLoaded()) {
-            physHandler.setTarget(mount.phys, targetPos);
-        }
     }
 
     public boolean atTargetYaw(boolean lag) {
@@ -138,10 +124,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
 
         if (mount.kind == MountKind.CBC && Mods.CREATEBIGCANNONS.isLoaded()) {
             return cannonHandler.atTargetYaw(mount.cbc, lag);
-        }
-
-        if (mount.kind == MountKind.PHYS && Mods.VS_CLOCKWORK.isLoaded()) {
-            return physHandler.atTargetYaw(mount.phys, lag);
         }
 
         return false;
@@ -201,8 +183,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
 
             if (Mods.CREATEBIGCANNONS.isLoaded() && adjacent instanceof CannonMountBlockEntity cbc) {
                 newMount = Mount.cbc(cbc);
-            } else if (Mods.VS_CLOCKWORK.isLoaded() && adjacent instanceof PhysBearingBlockEntity phys) {
-                newMount = Mount.phys(phys);
             }
         }
 
@@ -212,7 +192,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
         if (newMount == null) {
             isRunning = false;
             hasLastCbcYawWritten = false;
-            physHandler.reset();
         }
 
         setChanged();
@@ -265,44 +244,15 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
     }
 
     public double computeYawToTargetDeg(Vec3 cannonCenterWorld, Vec3 targetWorld) {
-        Ship ship = getShipIfPresent();
-
-        Vec3 cannonCenter = cannonCenterWorld;
-        Vec3 target = targetWorld;
-
-        if (Mods.VALKYRIENSKIES.isLoaded() && ship != null) {
-            cannonCenter = toShipSpace(ship, cannonCenterWorld);
-            target = toShipSpace(ship, targetWorld);
-        }
-
-        double dx = target.x - cannonCenter.x;
-        double dz = target.z - cannonCenter.z;
+        double dx = targetWorld.x - cannonCenterWorld.x;
+        double dz = targetWorld.z - cannonCenterWorld.z;
 
         return Math.toDegrees(Math.atan2(dz, dx)) + 90.0;
     }
 
-    @Nullable
-    private Ship getShipIfPresent() {
-        if (level == null) {
-            return null;
-        }
-
-        if (!Mods.VALKYRIENSKIES.isLoaded()) {
-            return null;
-        }
-
-        return VSGameUtilsKt.getShipManagingPos(level, worldPosition);
-    }
-
-    private Vec3 toShipSpace(Ship ship, Vec3 worldPos) {
-        Vector3d tmp = new Vector3d(worldPos.x, worldPos.y, worldPos.z);
-        ship.getTransform().getWorldToShip().transformPosition(tmp);
-        return new Vec3(tmp.x, tmp.y, tmp.z);
-    }
-
     @Override
-    protected void read(CompoundTag compound, boolean clientPacket) {
-        super.read(compound, clientPacket);
+    protected void read(CompoundTag compound, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(compound, registries, clientPacket);
 
         if (compound.contains("MinAngleDeg", Tag.TAG_DOUBLE)) {
             minAngleDeg = compound.getDouble("MinAngleDeg");
@@ -321,12 +271,11 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
         }
 
         hasLastCbcYawWritten = false;
-        physHandler.read(compound);
     }
 
     @Override
-    protected void write(CompoundTag compound, boolean clientPacket) {
-        super.write(compound, clientPacket);
+    protected void write(CompoundTag compound, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(compound, registries, clientPacket);
 
         compound.putDouble("MinAngleDeg", minAngleDeg);
         compound.putDouble("MaxAngleDeg", maxAngleDeg);
@@ -334,7 +283,6 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
         compound.putBoolean("IsRunning", isRunning);
         compound.putLong("LastKnownPos", lastKnownPos.asLong());
 
-        physHandler.write(compound);
     }
 
     @Override
@@ -400,27 +348,20 @@ public class AutoYawControllerBlockEntity extends KineticBlockEntity {
     }
 
     enum MountKind {
-        CBC,
-        PHYS
+        CBC
     }
 
     static class Mount {
         final MountKind kind;
         final CannonMountBlockEntity cbc;
-        final PhysBearingBlockEntity phys;
 
-        private Mount(MountKind kind, @Nullable CannonMountBlockEntity cbc, @Nullable PhysBearingBlockEntity phys) {
+        private Mount(MountKind kind, @Nullable CannonMountBlockEntity cbc) {
             this.kind = kind;
             this.cbc = cbc;
-            this.phys = phys;
         }
 
         static Mount cbc(CannonMountBlockEntity cbc) {
-            return new Mount(MountKind.CBC, cbc, null);
-        }
-
-        static Mount phys(PhysBearingBlockEntity phys) {
-            return new Mount(MountKind.PHYS, null, phys);
+            return new Mount(MountKind.CBC, cbc);
         }
     }
 }

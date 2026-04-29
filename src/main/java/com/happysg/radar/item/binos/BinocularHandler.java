@@ -8,16 +8,14 @@ import com.happysg.radar.registry.ModKeybinds;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ComputeFovModifierEvent;
-import net.minecraftforge.client.event.RenderHandEvent;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ComputeFovModifierEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderHandEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.slf4j.Logger;
 
-@Mod.EventBusSubscriber(value = Dist.CLIENT, modid = CreateRadar.MODID)
 public class BinocularHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static boolean wasDown = false;
@@ -31,9 +29,7 @@ public class BinocularHandler {
 
     private static Double savedSensitivity = null;
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null) return;
@@ -127,4 +123,3 @@ public class BinocularHandler {
         event.setNewFovModifier(BINOCULAR_FOV);
     }
 }
-

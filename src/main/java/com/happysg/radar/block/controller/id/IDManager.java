@@ -1,9 +1,9 @@
 package com.happysg.radar.block.controller.id;
 
 import net.minecraft.nbt.*;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
-import org.valkyrienskies.core.api.ships.Ship;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,32 +12,18 @@ public class IDManager extends SavedData {
 
     public static final IDManager INSTANCE = new IDManager();
 
-    // i key records by ship ID (long)
+    // Records are keyed by a stable transponder id.
     public static final Map<Long, IDRecord> ID_RECORDS = new HashMap<>();
 
     public record IDRecord(String name, String secretID) {}
 
-    // i save secretID to shipId, and i store the slug as the name
-    public static void addIDRecord(long shipId, String secretID, String shipSlugAsName) {
-        ID_RECORDS.put(shipId, new IDRecord(shipSlugAsName, secretID));
+    public static void addIDRecord(long id, String secretID, String name) {
+        ID_RECORDS.put(id, new IDRecord(name, secretID));
         INSTANCE.setDirty();
     }
 
-    public static void registerIDRecord(Ship ship, String secretID) {
-        addIDRecord(ship.getId(), secretID, ship.getSlug());
-    }
-
-    public static void removeIDRecord(Ship ship) {
-        ID_RECORDS.remove(ship.getId());
-        INSTANCE.setDirty();
-    }
-
-    public static IDRecord getIDRecordByShip(Ship ship) {
-        return ID_RECORDS.get(ship.getId());
-    }
-
-    public static IDRecord getIDRecordByShipId(long shipId) {
-        return ID_RECORDS.get(shipId);
+    public static IDRecord getIDRecordById(long id) {
+        return ID_RECORDS.get(id);
     }
 
     public static IDManager load(CompoundTag tag) {
@@ -66,8 +52,12 @@ public class IDManager extends SavedData {
         return INSTANCE;
     }
 
+    public static IDManager load(CompoundTag tag, HolderLookup.Provider provider) {
+        return load(tag);
+    }
+
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
         ListTag list = new ListTag();
 
         for (Map.Entry<Long, IDRecord> e : ID_RECORDS.entrySet()) {
@@ -85,6 +75,6 @@ public class IDManager extends SavedData {
     public static void load(MinecraftServer server) {
         server.overworld()
                 .getDataStorage()
-                .computeIfAbsent(IDManager::load, () -> INSTANCE, "create_radar_vs2_ids");
+                .computeIfAbsent(new Factory<>(() -> INSTANCE, IDManager::load), "create_radar_ids");
     }
 }

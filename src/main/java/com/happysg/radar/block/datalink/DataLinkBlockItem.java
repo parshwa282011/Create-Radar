@@ -12,11 +12,10 @@ import com.happysg.radar.block.monitor.MonitorBlockEntity;
 import com.happysg.radar.block.radar.bearing.RadarBearingBlock;
 import com.happysg.radar.block.radar.plane.StationaryRadarBlock;
 import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.vs2.PhysicsHandler;
+import com.happysg.radar.compat.aeronautics.PhysicsHandler;
 import com.happysg.radar.config.RadarConfig;
 import com.happysg.radar.registry.AllDataBehaviors;
 import com.happysg.radar.registry.ModBlocks;
-import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities;
 import net.createmod.catnip.outliner.Outliner;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -38,16 +37,16 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.util.TriState;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlock;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlockEntity;
 import rbasamoyai.createbigcannons.cannon_control.fixed_cannon_mount.FixedCannonMountBlock;
 import rbasamoyai.createbigcannons.cannon_control.fixed_cannon_mount.FixedCannonMountBlockEntity;
-import riftyboi.cbcmodernwarfare.cannon_control.compact_mount.CompactCannonMountBlockEntity;
 import net.arsenalists.createenergycannons.content.energymount.EnergyCannonMount;
 import net.arsenalists.createenergycannons.content.energymount.EnergyCannonMountBlockEntity;
 
@@ -66,7 +65,7 @@ public class DataLinkBlockItem extends BlockItem {
             if (ModBlocks.RADAR_LINK.has(event.getLevel()
                     .getBlockState(event.getPos())))
                 return;
-            event.setUseBlock(Event.Result.DENY);
+            event.setUseBlock(TriState.FALSE);
         }
     }
 
@@ -83,15 +82,15 @@ public class DataLinkBlockItem extends BlockItem {
             return InteractionResult.FAIL;
 
         // Shift-click clears any in-progress selection
-        if (player.isShiftKeyDown() && stack.hasTag()) {
+        if (player.isShiftKeyDown() && com.happysg.radar.utils.NbtCompat.hasTag(stack)) {
             if (!level.isClientSide) {
                 player.displayClientMessage(Component.translatable("display_link.clear"), true);
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
             }
             return InteractionResult.SUCCESS;
         }
 
-        CompoundTag tag = stack.getOrCreateTag();
+        CompoundTag tag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         var be = level.getBlockEntity(clickedPos);
 
         // ==========================================
@@ -109,7 +108,7 @@ public class DataLinkBlockItem extends BlockItem {
                 tag.remove("SelectedPitchPos");
                 tag.remove("SelectedFiringPos");
 
-                stack.setTag(tag);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, tag);
                 player.displayClientMessage(Component.translatable(CreateRadar.MODID + ".data_link.mount_set"), true);
             }
             return InteractionResult.SUCCESS;
@@ -128,7 +127,7 @@ public class DataLinkBlockItem extends BlockItem {
                 tag.remove("SelectedPitchPos");
                 tag.remove("SelectedFiringPos");
 
-                stack.setTag(tag);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, tag);
                 player.displayClientMessage(Component.translatable(CreateRadar.MODID + ".data_link.filterer_set"), true);
             }
             return InteractionResult.SUCCESS;
@@ -146,7 +145,7 @@ public class DataLinkBlockItem extends BlockItem {
             if (!(level instanceof ServerLevel serverLevel))
                 return InteractionResult.FAIL;
 
-            BlockPos mountPos = NbtUtils.readBlockPos(tag.getCompound("SelectedMountPos"));
+            BlockPos mountPos = com.happysg.radar.utils.NbtCompat.readBlockPos(tag.getCompound("SelectedMountPos"));
 
             WeaponNetworkData weaponData = WeaponNetworkData.get(serverLevel);
             BlockPos existingMount = weaponData.getMountForController(serverLevel.dimension(), clickedPos);
@@ -156,7 +155,7 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null); // user must restart each time
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null); // user must restart each time
                 return InteractionResult.FAIL;
             }
 
@@ -170,7 +169,7 @@ public class DataLinkBlockItem extends BlockItem {
                         Component.translatable(CreateRadar.MODID+ ".data_link.too_far").withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null); // user must restart each time
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null); // user must restart each time
                 return InteractionResult.FAIL;
             }
 
@@ -190,14 +189,14 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null); // user must restart each time
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null); // user must restart each time
                 return InteractionResult.FAIL;
             }
 
             // Place the DataLink (this is the ONLY place call in weapon mode)
             InteractionResult placed = super.useOn(ctx);
             if (placed == InteractionResult.FAIL) {
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return placed;
             }
 
@@ -208,7 +207,7 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return InteractionResult.FAIL;
             }
 
@@ -228,7 +227,7 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return InteractionResult.SUCCESS;
             }
 
@@ -239,7 +238,7 @@ public class DataLinkBlockItem extends BlockItem {
                     true
             );
 
-            stack.setTag(null); // do NOT keep mount selected; user must restart each time
+            com.happysg.radar.utils.NbtCompat.setTag(stack, null); // do NOT keep mount selected; user must restart each time
             return InteractionResult.SUCCESS;
         }
 
@@ -259,7 +258,7 @@ public class DataLinkBlockItem extends BlockItem {
                                     .withStyle(ChatFormatting.RED),
                             true
                     );
-                    stack.setTag(null); // user must restart each time
+                    com.happysg.radar.utils.NbtCompat.setTag(stack, null); // user must restart each time
                 }
                 return InteractionResult.FAIL;
             }
@@ -270,7 +269,7 @@ public class DataLinkBlockItem extends BlockItem {
             if (!(level instanceof ServerLevel serverLevel))
                 return InteractionResult.FAIL;
 
-            BlockPos filtererPos = NbtUtils.readBlockPos(tag.getCompound("SelectedFiltererPos"));
+            BlockPos filtererPos = com.happysg.radar.utils.NbtCompat.readBlockPos(tag.getCompound("SelectedFiltererPos"));
 
             // adjacent to target on clicked face
             BlockPos placedPos = clickedPos.relative(ctx.getClickedFace(), clickedState.canBeReplaced() ? 0 : 1);
@@ -282,7 +281,7 @@ public class DataLinkBlockItem extends BlockItem {
                         Component.translatable("display_link.too_far").withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return InteractionResult.FAIL;
             }
 
@@ -307,7 +306,7 @@ public class DataLinkBlockItem extends BlockItem {
                                         .withStyle(ChatFormatting.RED),
                                 true
                         );
-                        stack.setTag(null);
+                        com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                         return InteractionResult.FAIL;
                     }
 
@@ -320,7 +319,7 @@ public class DataLinkBlockItem extends BlockItem {
                                         .withStyle(ChatFormatting.RED),
                                 true
                         );
-                        stack.setTag(null);
+                        com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                         return InteractionResult.FAIL;
                     }
 
@@ -337,14 +336,14 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return InteractionResult.FAIL;
             }
 
             // Place the DataLink (ONLY placement path in filter mode)
             InteractionResult placed = super.useOn(ctx);
             if (placed == InteractionResult.FAIL) {
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return placed;
             }
 
@@ -354,7 +353,7 @@ public class DataLinkBlockItem extends BlockItem {
                                 .withStyle(ChatFormatting.RED),
                         true
                 );
-                stack.setTag(null);
+                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
                 return InteractionResult.FAIL;
             }
 
@@ -405,7 +404,7 @@ public class DataLinkBlockItem extends BlockItem {
                     true
             );
 
-            stack.setTag(null);
+            com.happysg.radar.utils.NbtCompat.setTag(stack, null);
             return InteractionResult.SUCCESS;
         }
 
@@ -437,9 +436,6 @@ public class DataLinkBlockItem extends BlockItem {
         if(Mods.CREATEENERGYCANNONS.isLoaded()){
             if(be instanceof EnergyCannonMountBlockEntity) return true;
         }
-        if(Mods.CBCMODERNWARFARE.isLoaded()){
-            if(be instanceof CompactCannonMountBlockEntity) return true;
-        }
         return false;
     }
     private enum MountType{NORMAL, FIXED, COMPACT, ENERGY}
@@ -449,9 +445,6 @@ public class DataLinkBlockItem extends BlockItem {
             if(be instanceof EnergyCannonMountBlockEntity) return MountType.ENERGY;
         }
         if(be instanceof CannonMountBlockEntity) return MountType.NORMAL;
-        if(Mods.CBCMODERNWARFARE.isLoaded()){
-            if(be instanceof CompactCannonMountBlockEntity) return MountType.COMPACT;
-        }
         return null;
     }
     private enum ControllerType { YAW, PITCH, FIRING }
@@ -498,18 +491,18 @@ public class DataLinkBlockItem extends BlockItem {
     }
 
     private static void clearControllersKeepMount(ItemStack stack) {
-        if (!stack.hasTag()) return;
-        CompoundTag tag = stack.getTag();
+        if (!com.happysg.radar.utils.NbtCompat.hasTag(stack)) return;
+        CompoundTag tag = com.happysg.radar.utils.NbtCompat.getTag(stack);
         tag.remove("SelectedYawPos");
         tag.remove("SelectedPitchPos");
         tag.remove("SelectedFiringPos");
         tag.remove("BlockEntityTag");
-        if (tag.isEmpty()) stack.setTag(null);
+        if (tag.isEmpty()) com.happysg.radar.utils.NbtCompat.setTag(stack, null);
     }
 
     private static void clearItemTag(Player player, InteractionHand hand) {
         ItemStack inHand = player.getItemInHand(hand);
-        if (!inHand.isEmpty()) inHand.setTag(null);
+        if (!inHand.isEmpty()) com.happysg.radar.utils.NbtCompat.setTag(inHand, null);
     }
 
     private static BlockPos lastShownPos = null;
@@ -523,13 +516,13 @@ public class DataLinkBlockItem extends BlockItem {
         ItemStack heldItemMainhand = player.getMainHandItem();
         if (!(heldItemMainhand.getItem() instanceof DataLinkBlockItem))
             return;
-        if (!heldItemMainhand.hasTag())
+        if (!com.happysg.radar.utils.NbtCompat.hasTag(heldItemMainhand))
             return;
-        CompoundTag stackTag = heldItemMainhand.getOrCreateTag();
+        CompoundTag stackTag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(heldItemMainhand);
         if (!stackTag.contains("SelectedPos"))
             return;
 
-        BlockPos selectedPos = NbtUtils.readBlockPos(stackTag.getCompound("SelectedPos"));
+        BlockPos selectedPos = com.happysg.radar.utils.NbtCompat.readBlockPos(stackTag.getCompound("SelectedPos"));
 
         if (!selectedPos.equals(lastShownPos)) {
             lastShownAABB = getBounds(selectedPos);
@@ -558,4 +551,3 @@ public class DataLinkBlockItem extends BlockItem {
 
 
 }
-

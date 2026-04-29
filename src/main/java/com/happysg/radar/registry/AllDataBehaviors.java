@@ -82,7 +82,7 @@ public class AllDataBehaviors {
             String idSuffix = behaviour instanceof DataPeripheral ? "_source" : "_target";
             if (suffix.length > 0)
                 idSuffix += "_" + suffix[0];
-            assignBlock(register(new ResourceLocation(registryName.getNamespace(), registryName.getPath() + idSuffix), behaviour), b);
+            assignBlock(register(ResourceLocation.fromNamespaceAndPath(registryName.getNamespace(), registryName.getPath() + idSuffix), behaviour), b);
         };
     }
 
@@ -92,7 +92,7 @@ public class AllDataBehaviors {
             String idSuffix = behaviour instanceof DataPeripheral ? "_source" : "_target";
             if (suffix.length > 0)
                 idSuffix += "_" + suffix[0];
-            assignBlockEntity(register(new ResourceLocation(registryName.getNamespace(), registryName.getPath() + idSuffix), behaviour), b);
+            assignBlockEntity(register(ResourceLocation.fromNamespaceAndPath(registryName.getNamespace(), registryName.getPath() + idSuffix), behaviour), b);
         };
     }
 

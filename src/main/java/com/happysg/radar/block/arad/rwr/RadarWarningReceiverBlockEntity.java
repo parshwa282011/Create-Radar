@@ -1,8 +1,7 @@
 package com.happysg.radar.block.arad.rwr;
 
 import com.happysg.radar.block.arad.aradnetworks.RadarContactRegistry;
-import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.vs2.VS2Utils;
+import com.happysg.radar.compat.aeronautics.PhysicsHandler;
 import com.happysg.radar.registry.ModSounds;
 import com.mojang.logging.LogUtils;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
@@ -13,8 +12,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.valkyrienskies.core.api.ships.Ship;
-import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 import java.util.List;
 
@@ -57,14 +54,7 @@ public class RadarWarningReceiverBlockEntity extends SmartBlockEntity {
         if (inRangeCooldownTicks > 0) inRangeCooldownTicks--;
         if (lockBeepTicks > 0) lockBeepTicks--;
 
-        Ship ship = VSGameUtilsKt.getShipManagingPos(level, worldPosition);
-        if (ship == null) {
-            resetSoundState();
-            return;
-        }
-
-        long key = ship.getId();
-        if(!Mods.VALKYRIENSKIES.isLoaded()) return;
+        long key = worldPosition.asLong();
         boolean locked = RadarContactRegistry.isLocked(sl, key);
         if (locked) LogUtils.getLogger().warn("locked");
         boolean inRange = RadarContactRegistry.isInRange(sl, key);
@@ -75,7 +65,7 @@ public class RadarWarningReceiverBlockEntity extends SmartBlockEntity {
             if (lockBeepTicks == 0) {
                 sl.playSound(
                         null,               // null = all nearby players hear it
-                        VS2Utils.getWorldPos(this),
+                        PhysicsHandler.getWorldPos(this),
                         ModSounds.RWR_LOCK.get(),
                         SoundSource.BLOCKS,
                         1.0f,
@@ -98,7 +88,7 @@ public class RadarWarningReceiverBlockEntity extends SmartBlockEntity {
             if (firstSpotted || inRangeCooldownTicks == 0) {
                 sl.playSound(
                         null,               // null = all nearby players hear it
-                        VS2Utils.getWorldPos(this),
+                        PhysicsHandler.getWorldPos(this),
                         ModSounds.RWR_IN_RANGE.get(),
                         SoundSource.BLOCKS,
                         1.0f,
@@ -122,7 +112,7 @@ public class RadarWarningReceiverBlockEntity extends SmartBlockEntity {
     }
 
     private static boolean computeOnShip(Level level, BlockPos pos) {
-        return VSGameUtilsKt.getShipManagingPos(level, pos) != null;
+        return true;
     }
 
     private static void refreshOnShip(Level level, BlockPos pos) {

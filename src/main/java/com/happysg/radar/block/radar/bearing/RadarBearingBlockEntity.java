@@ -8,9 +8,7 @@ import com.happysg.radar.block.behavior.networks.config.DetectionConfig;
 import com.happysg.radar.block.radar.behavior.IRadar;
 import com.happysg.radar.block.radar.behavior.RadarScanningBlockBehavior;
 import com.happysg.radar.block.radar.track.RadarTrack;
-import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.vs2.PhysicsHandler;
-import com.happysg.radar.compat.vs2.VS2Utils;
+import com.happysg.radar.compat.aeronautics.PhysicsHandler;
 import com.happysg.radar.config.RadarConfig;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.contraptions.AssemblyException;
@@ -206,8 +204,8 @@ public class RadarBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
 
     @Override
-    protected void read(CompoundTag compound, boolean clientPacket) {
-        super.read(compound, clientPacket);
+    protected void read(CompoundTag compound, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(compound, registries, clientPacket);
         dishCount = compound.getInt("dishCount");
         creative = compound.getBoolean("creative");
         if (compound.contains("receiverFacing"))
@@ -215,8 +213,8 @@ public class RadarBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
 
     @Override
-    public void write(CompoundTag compound, boolean clientPacket) {
-        super.write(compound, clientPacket);
+    public void write(CompoundTag compound, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(compound, registries, clientPacket);
         compound.putInt("dishCount", dishCount);
         compound.putBoolean("creative", creative);
         if (receiverFacing != null)
@@ -298,8 +296,7 @@ public class RadarBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
     @Override
     public boolean renderRelativeToMonitor(){
-        if(!Mods.VALKYRIENSKIES.isLoaded()) return false;
-        return (VS2Utils.isBlockInShipyard(level,getBlockPos()));
+        return false;
     }
     @Override
     public Direction getradarDirection() {

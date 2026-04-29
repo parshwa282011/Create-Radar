@@ -6,7 +6,6 @@ import com.happysg.radar.block.controller.id.IDManager;
 import com.happysg.radar.block.radar.behavior.IRadar;
 import com.happysg.radar.block.radar.track.RadarTrack;
 import com.happysg.radar.block.radar.track.TrackCategory;
-import com.happysg.radar.compat.vs2.PhysicsHandler;
 import com.happysg.radar.config.RadarConfig;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -103,7 +102,7 @@ public class MonitorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTicks) {
-        renderBackground(gg);
+        renderBackground(gg, mouseX, mouseY, partialTicks);
         drawPanelBackground(gg);
 
         MonitorBlockEntity monitor = getController();
@@ -225,7 +224,7 @@ public class MonitorScreen extends Screen {
         float facingOffset = radarFacingOffsetDeg(monitorFacing, radarFacing);
         float screenAngle = (a + facingOffset) % 360f;
 
-        if (monitor.getController().getShip() == null && radar.getRadarType().equals("spinning")) {
+        if (radar.getRadarType().equals("spinning")) {
             monitorFacing = monitor.getBlockState().getValue(MonitorBlock.FACING);
             radarFacing = Direction.NORTH;
             if (radarFacing == null) return;
@@ -238,22 +237,9 @@ public class MonitorScreen extends Screen {
                 default -> screenAngle = 30;
             }
 
-        } else if (monitor.getController().getShip() != null && radar.getRadarType().equals("spinning")) { // spinning radar on a ship
-            // Calculate the current angle
-            monitorFacing = monitor.getController().getBlockState().getValue(MonitorBlock.FACING);
-            Vec3 facingVec = new Vec3(monitorFacing.getStepX(), monitorFacing.getStepY(), monitorFacing.getStepZ());
-            Vec3 angleVec = PhysicsHandler.getWorldVecDirectionTransform(facingVec, monitor.getController());
-            screenAngle = (float) Math.toDegrees(Math.atan2(angleVec.x, angleVec.z));
-                screenAngle = screenAngle + radar.getGlobalAngle();
-            if (monitorFacing == Direction.NORTH || monitorFacing == Direction.SOUTH) {
-                screenAngle = (screenAngle + 180) % 360;
-            }
-
-            // Normalize to positive angles
-            screenAngle = (screenAngle + 360 + 180) % 360;
         }
 
-        if (radar.renderRelativeToMonitor() && monitor.getController().getShip() != null && !radar.getRadarType().equals("spinning")) {  // plane radar on a ship
+        if (radar.renderRelativeToMonitor() && !radar.getRadarType().equals("spinning")) {
             // Plane radar on ship - cone stays fixed, tracks rotate inside
             monitorFacing = monitor.getController().getBlockState().getValue(MonitorBlock.FACING);
             radarFacing = radar.getradarDirection();
@@ -267,12 +253,6 @@ public class MonitorScreen extends Screen {
                 case RIGHT -> screenAngle = 270;
                 default -> screenAngle = 30;
             }
-        }
-
-        if (radar.renderRelativeToMonitor() && monitor.getController().getShip() != null
-                && radar.getRadarType().equals("spinning")) {
-            float shipYawDeg = (float) Math.toDegrees(getShipYawRad(monitor.getController().getShip()));
-            screenAngle += -(shipYawDeg + 180f);
         }
 
         int cx = left + uiSize / 2;
@@ -349,22 +329,6 @@ public class MonitorScreen extends Screen {
         return new Vec3(x, v.y, z);
     }
 
-    private double getShipYawRad(org.valkyrienskies.core.api.ships.Ship ship) {
-        var transform = ship.getTransform();
-
-        org.joml.Quaterniond shipToWorld = new org.joml.Quaterniond();
-        try {
-            shipToWorld.set(transform.getShipToWorldRotation());
-        } catch (Throwable ignored) {
-            shipToWorld.set(transform.getRotation()).invert();
-        }
-
-        org.joml.Vector3d fwd = new org.joml.Vector3d(0, 0, 1);
-        shipToWorld.transform(fwd);
-
-        return Math.atan2(fwd.x, -fwd.z);
-    }
-
     private void renderTracks(GuiGraphics gg, MonitorBlockEntity monitor, IRadar radar) {
         Collection<RadarTrack> tracks = monitor.getTracks();
         if (tracks == null || tracks.isEmpty())
@@ -381,11 +345,6 @@ public class MonitorScreen extends Screen {
                 continue;
 
             Vec3 rel = track.position().subtract(radarPos);
-            if (radar.renderRelativeToMonitor() && monitor.getController().getShip() != null) {
-                float shipYawDeg = (float) Math.toDegrees(getShipYawRad(monitor.getController().getShip()));
-                rel = rotateAroundYDeg(rel, -(shipYawDeg + 180f));
-            }
-
             float xOff = calculateTrackOffset(rel, monitor.getBlockState().getValue(MonitorBlock.FACING), range, true);
             float zOff = calculateTrackOffset(rel, monitor.getBlockState().getValue(MonitorBlock.FACING), range, false);
 
@@ -475,11 +434,6 @@ public class MonitorScreen extends Screen {
 
         for (RadarTrack track : monitor.cachedTracks) {
             Vec3 rel = track.position().subtract(radarPos);
-            if (radar.renderRelativeToMonitor() && monitor.getController().getShip() != null) {
-                float shipYawDeg = (float) Math.toDegrees(getShipYawRad(monitor.getController().getShip()));
-                rel = rotateAroundYDeg(rel, -(shipYawDeg + 180f));
-            }
-
             float xOff = calculateTrackOffset(rel, facing, range, true);
             float zOff = calculateTrackOffset(rel, facing, range, false);
 
@@ -586,7 +540,7 @@ public class MonitorScreen extends Screen {
         if ("VS2:ship".equals(track.entityType())) {
             try {
                 long shipId = Long.parseLong(track.id());
-                IDManager.IDRecord rec = IDManager.getIDRecordByShipId(shipId);
+                IDManager.IDRecord rec = IDManager.getIDRecordById(shipId);
                 if (rec != null && rec.name() != null && !rec.name().isBlank())
                     return rec.name();
             } catch (NumberFormatException ignored) {

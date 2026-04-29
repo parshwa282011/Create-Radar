@@ -57,7 +57,6 @@ public class RadarBearingBlock extends BearingBlock implements IBE<RadarBearingB
         return super.getRenderShape(pState);
     }
 
-    @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (!player.getMainHandItem().isEmpty())
             return InteractionResult.PASS;

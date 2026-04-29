@@ -2,13 +2,10 @@ package com.happysg.radar.networking.packets;
 
 import com.happysg.radar.networking.networkhandlers.ListNBTHandler;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Supplier;
 
 public class SaveListsPacket {
     private final List<String> entries;
@@ -79,19 +76,6 @@ public class SaveListsPacket {
 
 
     /** Handle on the server: call the appropriate ListNBTHandler method **/
-    public static void handle(SaveListsPacket pkt, Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
-
-            if (pkt.isIdString) {
-                ListNBTHandler.saveStringToHeldItem(player, pkt.idString);
-            } else {
-                ListNBTHandler.saveToHeldItem(player, pkt.entries);
-            }
-            player.getInventory().setChanged(); // force sync
-        });
-        ctx.setPacketHandled(true);
+    public static void handle(SaveListsPacket pkt, Object ignored) {
     }
 }

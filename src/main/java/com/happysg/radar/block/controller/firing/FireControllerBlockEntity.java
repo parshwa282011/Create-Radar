@@ -173,8 +173,8 @@ public class FireControllerBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(CompoundTag tag, boolean clientPacket) {
-        super.write(tag, clientPacket);
+    protected void write(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(tag, registries, clientPacket);
         tag.putBoolean("Powered", powered);
         tag.putLong("LastKnownPos", lastKnownPos.asLong());
 
@@ -184,8 +184,8 @@ public class FireControllerBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void read(CompoundTag tag, boolean clientPacket) {
-        super.read(tag, clientPacket);
+    protected void read(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(tag, registries, clientPacket);
 
         powered = tag.getBoolean("Powered");
         if (level != null) {

@@ -8,23 +8,15 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.joml.Matrix4dc;
-import org.joml.Vector3d;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.Optional;
 
 public class DataLinkBlockEntity extends SmartBlockEntity {
 
     protected BlockPos targetOffset = BlockPos.ZERO;
-    @Nullable
-    private Long linkedShipId = null;
-    private BlockPos targetOffsetShip = BlockPos.ZERO;
-
     public DataPeripheral activeSource;
     public DataController activeTarget;
 
@@ -84,14 +76,14 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void writeSafe(CompoundTag tag) {
-        super.writeSafe(tag);
+    public void writeSafe(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.writeSafe(tag, registries);
         writeGatheredData(tag);
     }
 
     @Override
-    protected void write(CompoundTag tag, boolean clientPacket) {
-        super.write(tag, clientPacket);
+    protected void write(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(tag, registries, clientPacket);
         writeGatheredData(tag);
         if (clientPacket && activeTarget != null)
             tag.putString("TargetType", activeTarget.id.toString());
@@ -101,10 +93,6 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     private void writeGatheredData(CompoundTag tag) {
         tag.put("TargetOffset", NbtUtils.writeBlockPos(targetOffset));
 
-        if (linkedShipId != null)
-            tag.putLong("LinkedShipId", linkedShipId);
-        tag.put("TargetOffsetShip", NbtUtils.writeBlockPos(targetOffsetShip));
-
         if (activeSource != null) {
             CompoundTag data = sourceConfig.copy();
             data.putString("Id", activeSource.id.toString());
@@ -113,25 +101,20 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void read(CompoundTag tag, boolean clientPacket) {
-        super.read(tag, clientPacket);
+    protected void read(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(tag, registries, clientPacket);
 
-        targetOffset = NbtUtils.readBlockPos(tag.getCompound("TargetOffset"));
+        targetOffset = com.happysg.radar.utils.NbtCompat.readBlockPos(tag.getCompound("TargetOffset"));
         ledState = tag.getBoolean("LedState");
 
-        linkedShipId = tag.contains("LinkedShipId") ? tag.getLong("LinkedShipId") : null;
-        targetOffsetShip = tag.contains("TargetOffsetShip")
-                ? NbtUtils.readBlockPos(tag.getCompound("TargetOffsetShip"))
-                : BlockPos.ZERO;
-
         if (clientPacket && tag.contains("TargetType"))
-            activeTarget = AllDataBehaviors.getTarget(new ResourceLocation(tag.getString("TargetType")));
+            activeTarget = AllDataBehaviors.getTarget(ResourceLocation.parse(tag.getString("TargetType")));
 
         if (!tag.contains("Source"))
             return;
 
         CompoundTag data = tag.getCompound("Source");
-        activeSource = AllDataBehaviors.getSource(new ResourceLocation(data.getString("Id")));
+        activeSource = AllDataBehaviors.getSource(ResourceLocation.parse(data.getString("Id")));
         sourceConfig = new CompoundTag();
         if (activeSource != null)
             sourceConfig = data.copy();
@@ -140,46 +123,12 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
 
 
     public void target(BlockPos targetPosition) {
-        if (!(level instanceof ServerLevel sl)) {
-            this.targetOffset = targetPosition.subtract(worldPosition);
-            return;
-        }
-
-        var ship = org.valkyrienskies.mod.common.VSGameUtilsKt.getShipManagingPos(sl, worldPosition);
-        var targetShip = org.valkyrienskies.mod.common.VSGameUtilsKt.getShipManagingPos(sl, targetPosition);
-
-        if (ship != null && targetShip != null && ship.getId() == targetShip.getId()) {
-            linkedShipId = ship.getId();
-
-            BlockPos selfShipPos   = toShipBlockPos(ship, worldPosition);
-            BlockPos targetShipPos = toShipBlockPos(ship, targetPosition);
-
-            targetOffsetShip = targetShipPos.subtract(selfShipPos);
-
-            targetOffset = targetPosition.subtract(worldPosition);
-            setChanged();
-            return;
-        }
-
-        linkedShipId = null;
-        targetOffsetShip = BlockPos.ZERO;
         this.targetOffset = targetPosition.subtract(worldPosition);
         setChanged();
     }
 
     public BlockPos getSourcePosition() {
-        if (!(level instanceof ServerLevel sl) || linkedShipId == null)
-            return worldPosition.relative(getDirection());
-
-        var ship = org.valkyrienskies.mod.common.VSGameUtilsKt.getShipManagingPos(sl, worldPosition);
-        if (ship == null || ship.getId() != linkedShipId) {
-            linkedShipId = null;
-            return worldPosition.relative(getDirection());
-        }
-
-        BlockPos selfShipPos = toShipBlockPos(ship, worldPosition);
-        BlockPos sourceShipPos = selfShipPos.relative(getDirection());
-        return toWorldBlockPos(ship, sourceShipPos);
+        return worldPosition.relative(getDirection());
     }
 
     public CompoundTag getSourceConfig() {
@@ -197,38 +146,6 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     }
 
     public BlockPos getTargetPosition() {
-        if (!(level instanceof ServerLevel sl) || linkedShipId == null) {
-            return worldPosition.offset(targetOffset);
-        }
-
-        var ship = org.valkyrienskies.mod.common.VSGameUtilsKt.getShipManagingPos(sl, worldPosition);
-        if (ship == null || ship.getId() != linkedShipId) {
-            // ship changed / disassembled; fall back
-            linkedShipId = null;
-            return worldPosition.offset(targetOffset);
-        }
-
-        BlockPos selfShipPos = toShipBlockPos(ship, worldPosition);
-        BlockPos targetShipPos = selfShipPos.offset(targetOffsetShip);
-
-        return toWorldBlockPos(ship, targetShipPos);
-    }
-
-    private static BlockPos toShipBlockPos(org.valkyrienskies.core.api.ships.ServerShip ship, BlockPos worldPos) {
-        Vector3d v = new Vector3d(worldPos.getX() + 0.5, worldPos.getY() + 0.5, worldPos.getZ() + 0.5);
-
-        Matrix4dc worldToShip = ship.getWorldToShip();
-        worldToShip.transformPosition(v);
-
-        return BlockPos.containing(v.x, v.y, v.z);
-    }
-
-    private static BlockPos toWorldBlockPos(org.valkyrienskies.core.api.ships.ServerShip ship, BlockPos shipPos) {
-        Vector3d v = new Vector3d(shipPos.getX() + 0.5, shipPos.getY() + 0.5, shipPos.getZ() + 0.5);
-
-        Matrix4dc shipToWorld = ship.getShipToWorld();
-        shipToWorld.transformPosition(v);
-
-        return BlockPos.containing(v.x, v.y, v.z);
+        return worldPosition.offset(targetOffset);
     }
 }

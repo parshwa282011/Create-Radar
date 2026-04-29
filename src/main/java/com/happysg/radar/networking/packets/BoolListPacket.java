@@ -3,12 +3,6 @@ package com.happysg.radar.networking.packets;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 public class BoolListPacket {
     private static final int EXPECTED_FLAG_COUNT = 7;
@@ -39,72 +33,6 @@ public class BoolListPacket {
         return new BoolListPacket(main, f, key);
     }
 
-    public static void handle(BoolListPacket pkt, Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
-
-            if (pkt.flags == null) return;
-            if (pkt.flags.length != EXPECTED_FLAG_COUNT) return;
-
-            InteractionHand hand = pkt.mainHand ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
-            ItemStack stack = player.getItemInHand(hand);
-            if (stack.isEmpty()) return;
-
-            try {
-                if ("detectBools".equals(pkt.key)) {
-                    CompoundTag root = stack.getOrCreateTag();
-
-                    CompoundTag filters = root.contains("Filters", Tag.TAG_COMPOUND) ? root.getCompound("Filters") : new CompoundTag();
-
-                    CompoundTag det = new CompoundTag();
-                    det.putBoolean("player", pkt.flags[0]);
-                    det.putBoolean("vs2", pkt.flags[1]);
-                    det.putBoolean("contraption", pkt.flags[2]);
-                    det.putBoolean("mob", pkt.flags[3]);
-                    det.putBoolean("animal", pkt.flags[4]);
-                    det.putBoolean("projectile", pkt.flags[5]);
-                    det.putBoolean("item", pkt.flags[6]);
-
-                    byte[] arr = new byte[pkt.flags.length];
-                    for (int i = 0; i < pkt.flags.length; i++) arr[i] = (byte) (pkt.flags[i] ? 1 : 0);
-                    root.putByteArray(pkt.key, arr);
-
-                    filters.put("detection", det);
-                    root.put("Filters", filters);
-
-                    stack.setTag(root);
-                } else if ("TargetBools".equals(pkt.key)) {
-                    CompoundTag root = stack.getOrCreateTag();
-                    CompoundTag filters = root.contains("Filters", Tag.TAG_COMPOUND) ? root.getCompound("Filters") : new CompoundTag();
-
-                    CompoundTag tgt = new CompoundTag();
-                    tgt.putBoolean("player", pkt.flags[0]);
-                    tgt.putBoolean("contraption", pkt.flags[1]);
-                    tgt.putBoolean("mob", pkt.flags[2]);
-                    tgt.putBoolean("animal", pkt.flags[3]);
-                    tgt.putBoolean("projectile", pkt.flags[4]);
-                    tgt.putBoolean("lineSight", pkt.flags[5]);
-                    tgt.putBoolean("autoTarget", pkt.flags[6]);
-
-                    byte[] arr = new byte[pkt.flags.length];
-                    for (int i = 0; i < pkt.flags.length; i++) arr[i] = (byte) (pkt.flags[i] ? 1 : 0);
-                    root.putByteArray(pkt.key, arr);
-
-                    filters.put("targeting", tgt);
-                    root.put("Filters", filters);
-                    stack.setTag(root);
-                }
-
-                player.setItemInHand(hand, stack);
-                player.inventoryMenu.broadcastChanges();
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        });
-
-        ctx.setPacketHandled(true);
+    public static void handle(BoolListPacket pkt, Object ignored) {
     }
 }

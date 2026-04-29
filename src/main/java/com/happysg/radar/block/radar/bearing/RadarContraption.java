@@ -5,7 +5,7 @@ import com.happysg.radar.block.datalink.DataLinkBlock;
 import com.happysg.radar.block.radar.receiver.AbstractRadarFrame;
 import com.happysg.radar.block.radar.receiver.RadarReceiverBlock;
 import com.happysg.radar.registry.ModBlocks;
-import com.happysg.radar.registry.ModContraptionTypes;
+import com.simibubi.create.AllContraptionTypes;
 import com.simibubi.create.content.contraptions.AssemblyException;
 import com.simibubi.create.api.contraption.ContraptionType;
 import com.simibubi.create.content.contraptions.bearing.BearingContraption;
@@ -85,6 +85,6 @@ public class RadarContraption extends BearingContraption {
 
     @Override
     public ContraptionType getType() {
-        return ModContraptionTypes.RADAR_BEARING;
+        return AllContraptionTypes.BEARING.value();
     }
 }

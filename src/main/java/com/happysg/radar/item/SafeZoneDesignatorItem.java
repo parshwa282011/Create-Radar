@@ -12,6 +12,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -29,9 +30,9 @@ public class SafeZoneDesignatorItem extends Item {
     public void inventoryTick(ItemStack pStack, Level pLevel, Entity pEntity, int pSlotId, boolean pIsSelected) {
         super.inventoryTick(pStack, pLevel, pEntity, pSlotId, pIsSelected);
         if (pIsSelected) {
-            CompoundTag data = pStack.getOrCreateTag();
+            CompoundTag data = com.happysg.radar.utils.NbtCompat.getOrCreateTag(pStack);
             if (data.contains("monitorPos")) {
-                BlockPos monitorPos = NbtUtils.readBlockPos(data.getCompound("monitorPos"));
+                BlockPos monitorPos = com.happysg.radar.utils.NbtCompat.readBlockPos(data.getCompound("monitorPos"));
                 if (pLevel.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitorBlockEntity && pLevel.isClientSide) {
                     monitorBlockEntity.showSafeZone();
                 }
@@ -44,7 +45,7 @@ public class SafeZoneDesignatorItem extends Item {
         BlockPos pos = pContext.getClickedPos();
         Level level = pContext.getLevel();
         ItemStack stack = pContext.getItemInHand();
-        CompoundTag data = stack.getOrCreateTag();
+        CompoundTag data = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         Player player = pContext.getPlayer();
 
         if (player == null) {
@@ -61,7 +62,7 @@ public class SafeZoneDesignatorItem extends Item {
             displayMessage(player, CreateRadar.MODID + ".item.safe_zone_designator.no_monitor", ChatFormatting.RED);
             return InteractionResult.FAIL;
         }
-        BlockPos monitorPos = NbtUtils.readBlockPos(data.getCompound("monitorPos"));
+        BlockPos monitorPos = com.happysg.radar.utils.NbtCompat.readBlockPos(data.getCompound("monitorPos"));
 
         if (!data.contains("startPos")) {
             if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitorBlockEntity) {
@@ -79,7 +80,7 @@ public class SafeZoneDesignatorItem extends Item {
                 return InteractionResult.SUCCESS;
             }
 
-            BlockPos startPos = NbtUtils.readBlockPos(data.getCompound("startPos"));
+            BlockPos startPos = com.happysg.radar.utils.NbtCompat.readBlockPos(data.getCompound("startPos"));
 
             if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitorBlockEntity) {
                 monitorBlockEntity.addSafeZone(startPos, pos);
@@ -99,10 +100,10 @@ public class SafeZoneDesignatorItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack pStack, Level pLevel, List<Component> pTooltipComponents, TooltipFlag pIsAdvanced) {
-        super.appendHoverText(pStack, pLevel, pTooltipComponents, pIsAdvanced);
-        if (pStack.getOrCreateTag().contains("monitorPos")) {
-            BlockPos monitorPos = NbtUtils.readBlockPos(pStack.getOrCreateTag().getCompound("monitorPos"));
+    public void appendHoverText(ItemStack pStack, Item.TooltipContext pContext, List<Component> pTooltipComponents, TooltipFlag pIsAdvanced) {
+        super.appendHoverText(pStack, pContext, pTooltipComponents, pIsAdvanced);
+        if (com.happysg.radar.utils.NbtCompat.getOrCreateTag(pStack).contains("monitorPos")) {
+            BlockPos monitorPos = com.happysg.radar.utils.NbtCompat.readBlockPos(com.happysg.radar.utils.NbtCompat.getOrCreateTag(pStack).getCompound("monitorPos"));
             pTooltipComponents.add(Component.translatable(CreateRadar.MODID + ".guided_fuze.linked_monitor", monitorPos));
         } else
             pTooltipComponents.add(Component.translatable(CreateRadar.MODID + ".guided_fuze.no_monitor"));
@@ -110,9 +111,9 @@ public class SafeZoneDesignatorItem extends Item {
 
     @Nullable
     public BlockPos getMonitorPos(ItemStack stack) {
-        CompoundTag data = stack.getOrCreateTag();
+        CompoundTag data = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         if (data.contains("monitorPos")) {
-            return NbtUtils.readBlockPos(data.getCompound("monitorPos"));
+            return com.happysg.radar.utils.NbtCompat.readBlockPos(data.getCompound("monitorPos"));
         }
         return null;
     }

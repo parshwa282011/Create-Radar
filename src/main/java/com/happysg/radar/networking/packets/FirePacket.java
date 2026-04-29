@@ -9,10 +9,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.network.NetworkEvent;
 
 import javax.annotation.Nullable;
-import java.util.function.Supplier;
 
 public class FirePacket {
 
@@ -31,37 +29,7 @@ public class FirePacket {
         return new FirePacket(buf.readBoolean());
     }
 
-    public static void handle(FirePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            Player player = ctx.get().getSender();
-            if (player == null) return;
-            if (!(player.level() instanceof ServerLevel serverLevel)) return;
-
-           // if (!player.isUsingItem()) return;
-
-            ItemStack binos = player.getMainHandItem();
-            if (!(binos.getItem() instanceof Binoculars)) return;
-
-            BlockPos filtererPos = getFiltererPos(binos);
-            if (filtererPos == null) return;
-            if (!serverLevel.isLoaded(filtererPos)) return;
-
-            if (!(serverLevel.getBlockEntity(filtererPos) instanceof NetworkFiltererBlockEntity filtererBe)) return;
-
-            if (msg.enable) {
-                BlockPos hit = Binoculars.getLastHit(binos);
-                if (hit == null) return;
-                filtererBe.onBinocularsTriggered(player,binos, false);
-
-            } else {
-                // release: go back to normal
-                filtererBe.onBinocularsTriggered(player, binos, true);
-            }
-
-            filtererBe.setChanged();
-        });
-
-        ctx.get().setPacketHandled(true);
+    public static void handle(FirePacket msg, Object ignored) {
     }
 
     private static ItemStack findBinosStack(Player player) {
@@ -80,10 +48,10 @@ public class FirePacket {
 
     @Nullable
     private static BlockPos getFiltererPos(ItemStack stack) {
-        CompoundTag tag = stack.getTag();
+        CompoundTag tag = com.happysg.radar.utils.NbtCompat.getTag(stack);
         if (tag == null) return null;
         if (!tag.contains(TAG_FILTERER_POS)) return null;
 
-        return NbtUtils.readBlockPos(tag.getCompound(TAG_FILTERER_POS));
+        return com.happysg.radar.utils.NbtCompat.readBlockPos(tag.getCompound(TAG_FILTERER_POS));
     }
 }

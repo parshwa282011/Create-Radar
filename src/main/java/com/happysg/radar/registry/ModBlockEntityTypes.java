@@ -25,7 +25,6 @@ import com.simibubi.create.content.kinetics.base.ShaftRenderer;
 import com.simibubi.create.content.kinetics.base.ShaftVisual;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.tterrag.registrate.util.entry.BlockEntityEntry;
-import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountVisual;
 
 import static com.happysg.radar.CreateRadar.REGISTRATE;
@@ -86,6 +85,14 @@ public class ModBlockEntityTypes {
             .blockEntity("sky_radar",SkyRadarBlockEntity::new)
             .visual(()-> CannonMountVisual::new,false)
             .validBlocks(ModBlocks.SKY_RADAR)
+            .register();
+    public static final BlockEntityEntry<StationaryRadarBlockEntity> STATIONARY_RADAR_BE = REGISTRATE
+            .blockEntity("stationary_radar", StationaryRadarBlockEntity::new)
+            .validBlocks(ModBlocks.STATIONARY_RADAR)
+            .register();
+    public static final BlockEntityEntry<RadarWarningReceiverBlockEntity> RWR_BE = REGISTRATE
+            .blockEntity("radar_warning_receiver", RadarWarningReceiverBlockEntity::new)
+            .validBlocks(ModBlocks.RWR_BLOCK)
             .register();
 
     public static void register() {

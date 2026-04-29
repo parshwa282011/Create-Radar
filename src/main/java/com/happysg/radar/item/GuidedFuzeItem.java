@@ -10,6 +10,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
@@ -32,7 +33,9 @@ public class GuidedFuzeItem extends FuzeItem {
     public InteractionResult useOn(UseOnContext pContext) {
         BlockPos clickedPos = pContext.getClickedPos();
         if (pContext.getLevel().getBlockEntity(clickedPos) instanceof NetworkFiltererBlockEntity blockEntity) {
-            pContext.getItemInHand().getOrCreateTag().put("monitorPos", NbtUtils.writeBlockPos(blockEntity.getBlockPos()));
+            CompoundTag tag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(pContext.getItemInHand());
+            tag.put("monitorPos", NbtUtils.writeBlockPos(blockEntity.getBlockPos()));
+            com.happysg.radar.utils.NbtCompat.setTag(pContext.getItemInHand(), tag);
             return InteractionResult.SUCCESS;
         }
         return super.useOn(pContext);
@@ -42,7 +45,7 @@ public class GuidedFuzeItem extends FuzeItem {
     public boolean onProjectileTick(ItemStack stack, AbstractCannonProjectile projectile) {
         boolean detonate = super.onProjectileTick(stack, projectile);
 
-        CompoundTag tag = stack.getOrCreateTag();
+        CompoundTag tag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         if (!tag.contains("monitorPos"))
             return detonate;
 
@@ -52,7 +55,7 @@ public class GuidedFuzeItem extends FuzeItem {
         if (vel.y > 0 && !RadarConfig.server().guidedFuzeSeekBeforeApex.get())
             return detonate;
 
-        BlockPos monitorPos = NbtUtils.readBlockPos(tag.getCompound("monitorPos"));
+        BlockPos monitorPos = com.happysg.radar.utils.NbtCompat.readBlockPos(tag.getCompound("monitorPos"));
         if (!(projectile.level().getBlockEntity(monitorPos) instanceof NetworkFiltererBlockEntity monitor))
             return detonate;
 
@@ -159,10 +162,10 @@ public class GuidedFuzeItem extends FuzeItem {
     }
 
     @Override
-    public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> pTooltipComponents, TooltipFlag pIsAdvanced) {
-        super.appendHoverText(pStack, pLevel, pTooltipComponents, pIsAdvanced);
-        if (pStack.getOrCreateTag().contains("monitorPos")) {
-            BlockPos monitorPos = NbtUtils.readBlockPos(pStack.getOrCreateTag().getCompound("monitorPos"));
+    public void appendHoverText(ItemStack pStack, Item.TooltipContext pContext, List<Component> pTooltipComponents, TooltipFlag pIsAdvanced) {
+        super.appendHoverText(pStack, pContext, pTooltipComponents, pIsAdvanced);
+        if (com.happysg.radar.utils.NbtCompat.getOrCreateTag(pStack).contains("monitorPos")) {
+            BlockPos monitorPos = com.happysg.radar.utils.NbtCompat.readBlockPos(com.happysg.radar.utils.NbtCompat.getOrCreateTag(pStack).getCompound("monitorPos"));
             pTooltipComponents.add(Component.translatable(CreateRadar.MODID + ".guided_fuze.linked_monitor").append(monitorPos.toShortString()));
         } else
             pTooltipComponents.add(Component.translatable(CreateRadar.MODID + ".guided_fuze.no_monitor"));

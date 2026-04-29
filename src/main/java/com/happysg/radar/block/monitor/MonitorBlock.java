@@ -4,6 +4,7 @@ import com.happysg.radar.block.behavior.networks.NetworkData;
 import com.happysg.radar.config.RadarConfig;
 import com.happysg.radar.registry.ModBlockEntityTypes;
 import com.mojang.logging.LogUtils;
+import com.mojang.serialization.MapCodec;
 import com.simibubi.create.foundation.block.IBE;
 import net.createmod.catnip.lang.Lang;
 import net.minecraft.core.BlockPos;
@@ -25,11 +26,17 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.fml.DistExecutor;
 import org.jetbrains.annotations.NotNull;
 
 
 public class MonitorBlock extends HorizontalDirectionalBlock implements IBE<MonitorBlockEntity> {
+    public static final MapCodec<MonitorBlock> CODEC = simpleCodec(MonitorBlock::new);
+
+    @Override
+    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
+        return CODEC;
+    }
+
     public MonitorBlock(Properties pProperties) {
         super(pProperties);
         this.registerDefaultState(this.defaultBlockState()
@@ -68,7 +75,6 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements IBE<Moni
         super.onNeighborChange(state, level, pos, neighbor);
     }
 
-    @Override
     public @NotNull InteractionResult use(@NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull InteractionHand pHand, @NotNull BlockHitResult pHit) {
         if (!pPlayer.getMainHandItem().isEmpty() || pHand == InteractionHand.OFF_HAND)
             return InteractionResult.PASS;
@@ -160,13 +166,10 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements IBE<Moni
         // i pass only the position across, not the block entity
         BlockPos pos = anyPiece.getBlockPos();
 
-        DistExecutor.unsafeRunWhenOn(
-                net.minecraftforge.api.distmarker.Dist.CLIENT,
-                () -> () -> Client.openMonitorScreen(pos)
-        );
+        Client.openMonitorScreen(pos);
     }
 
-    @net.minecraftforge.api.distmarker.OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
+    @net.neoforged.api.distmarker.OnlyIn(net.neoforged.api.distmarker.Dist.CLIENT)
     private static final class Client {
         static void openMonitorScreen(BlockPos clickedPos) {
             var mc = net.minecraft.client.Minecraft.getInstance();

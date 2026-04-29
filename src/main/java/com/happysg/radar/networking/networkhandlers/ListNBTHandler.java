@@ -22,7 +22,7 @@ public class ListNBTHandler {
         ItemStack stack = player.getMainHandItem();
         if (stack.isEmpty()) return;
 
-        CompoundTag root = stack.getOrCreateTag();
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         CompoundTag filters = root.contains(FILTERS_ROOT, Tag.TAG_COMPOUND)
                 ? root.getCompound(FILTERS_ROOT)
                 : new CompoundTag();
@@ -41,7 +41,7 @@ public class ListNBTHandler {
         root.remove(SINGLE_KEY);
         root.remove("FriendOrFoeList");
 
-        stack.setTag(root);
+        com.happysg.radar.utils.NbtCompat.setTag(stack, root);
         player.getInventory().setChanged();
         player.containerMenu.broadcastChanges();
     }
@@ -50,7 +50,7 @@ public class ListNBTHandler {
         ItemStack stack = player.getMainHandItem();
         if (stack.isEmpty()) return;
 
-        CompoundTag root = stack.getOrCreateTag();
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getOrCreateTag(stack);
         CompoundTag filters = root.contains(FILTERS_ROOT, Tag.TAG_COMPOUND)
                 ? root.getCompound(FILTERS_ROOT)
                 : new CompoundTag();
@@ -68,7 +68,7 @@ public class ListNBTHandler {
         root.remove(SINGLE_KEY);
         root.remove("FriendOrFoeList");
 
-        stack.setTag(root);
+        com.happysg.radar.utils.NbtCompat.setTag(stack, root);
         player.getInventory().setChanged();
         player.containerMenu.broadcastChanges();
     }
@@ -76,9 +76,9 @@ public class ListNBTHandler {
     public static LoadedLists loadFromHeldItem(Player player) {
         ItemStack stack = player.getMainHandItem();
         LoadedLists loaded = new LoadedLists();
-        if (stack.isEmpty() || !stack.hasTag()) return loaded;
+        if (stack.isEmpty() || !com.happysg.radar.utils.NbtCompat.hasTag(stack)) return loaded;
 
-        CompoundTag root = stack.getTag();
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getTag(stack);
         if (root == null) return loaded;
 
         // New format first
@@ -100,9 +100,9 @@ public class ListNBTHandler {
 
     public static String loadStringFromHeldItem(Player player) {
         ItemStack stack = player.getMainHandItem();
-        if (stack.isEmpty() || !stack.hasTag()) return "";
+        if (stack.isEmpty() || !com.happysg.radar.utils.NbtCompat.hasTag(stack)) return "";
 
-        CompoundTag root = stack.getTag();
+        CompoundTag root = com.happysg.radar.utils.NbtCompat.getTag(stack);
         if (root == null) return "";
 
         // New format first

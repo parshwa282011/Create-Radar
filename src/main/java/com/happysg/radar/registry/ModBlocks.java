@@ -4,6 +4,7 @@ import com.happysg.radar.CreateRadar;
 
 
 import com.happysg.radar.block.arad.jammer.shield.ShieldJammerBlock;
+import com.happysg.radar.block.arad.rwr.RadarWarningReceiverBlock;
 import com.happysg.radar.block.controller.networkcontroller.NetworkFiltererBlock;
 import com.happysg.radar.block.controller.firing.FireControllerBlock;
 import com.happysg.radar.block.controller.pitch.AutoPitchControllerBlock;
@@ -14,6 +15,7 @@ import com.happysg.radar.block.datalink.DataLinkBlockItem;
 import com.happysg.radar.block.monitor.MonitorBlock;
 import com.happysg.radar.block.mount.SmartMountBlock;
 import com.happysg.radar.block.radar.bearing.RadarBearingBlock;
+import com.happysg.radar.block.radar.plane.StationaryRadarBlock;
 import com.happysg.radar.block.radar.radome.CannonMountRadomeBlock;
 import com.happysg.radar.block.radar.receiver.AbstractRadarFrame;
 import com.happysg.radar.block.radar.receiver.RadarReceiverBlock;
@@ -29,7 +31,7 @@ import com.tterrag.registrate.util.entry.BlockEntry;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraftforge.client.model.generators.ConfiguredModel;
+import net.neoforged.neoforge.client.model.generators.ConfiguredModel;
 
 import static com.happysg.radar.CreateRadar.REGISTRATE;
 import static com.simibubi.create.foundation.data.TagGen.axeOrPickaxe;
@@ -181,11 +183,11 @@ public class ModBlocks {
                         provider.getVariantBuilder(context.get())
                                 .partialState().with(FireControllerBlock.POWERED, false)
                                 .modelForState()
-                                .modelFile(provider.models().cubeAll("off",new ResourceLocation("create_radar","block/off")))
+                                .modelFile(provider.models().cubeAll("off",ResourceLocation.fromNamespaceAndPath("create_radar", "block/off")))
                                 .addModel()
                                 .partialState().with(FireControllerBlock.POWERED, true)
                                 .modelForState()
-                                .modelFile(provider.models().cubeAll("on",new ResourceLocation("create_radar","block/on")))
+                                .modelFile(provider.models().cubeAll("on",ResourceLocation.fromNamespaceAndPath("create_radar", "block/on")))
                                 .addModel();
                     })          .properties(p -> p.noOcclusion())
                     .properties(p -> p.strength(0.8f))
@@ -229,6 +231,23 @@ public class ModBlocks {
                     .register();
     public static final BlockEntry<SkyRadarBlock> SKY_RADAR =
             REGISTRATE.block("sky_radar", SkyRadarBlock::new)
+                    .initialProperties(SharedProperties::softMetal)
+                    .properties(properties -> properties.noOcclusion())
+                    .properties(p -> p.strength(0.8f))
+                    .transform(axeOrPickaxe())
+                    .simpleItem()
+                    .register();
+    public static final BlockEntry<StationaryRadarBlock> STATIONARY_RADAR =
+            REGISTRATE.block("stationary_radar", StationaryRadarBlock::new)
+                    .initialProperties(SharedProperties::softMetal)
+                    .properties(properties -> properties.noOcclusion())
+                    .properties(p -> p.strength(0.8f))
+                    .transform(axeOrPickaxe())
+                    .blockstate((c, p) -> p.horizontalBlock(c.getEntry(), AssetLookup.standardModel(c, p)))
+                    .simpleItem()
+                    .register();
+    public static final BlockEntry<RadarWarningReceiverBlock> RWR_BLOCK =
+            REGISTRATE.block("radar_warning_receiver", RadarWarningReceiverBlock::new)
                     .initialProperties(SharedProperties::softMetal)
                     .properties(properties -> properties.noOcclusion())
                     .properties(p -> p.strength(0.8f))
