@@ -147,6 +147,9 @@ dependencies {
 
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    implementation "maven.modrinth:sable:ADGYo8vU"
+    implementation "maven.modrinth:create-aeronautics:YhZLrAFC"
 }
 
 tasks.named('processResources', ProcessResources).configure {
