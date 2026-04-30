@@ -10,6 +10,7 @@ import com.happysg.radar.block.controller.pitch.AutoPitchControllerBlockEntity;
 import com.happysg.radar.block.controller.track.TrackControllerBlockEntity;
 import com.happysg.radar.block.controller.yaw.AutoYawControllerBlockEntity;
 import com.happysg.radar.block.datalink.DataLinkBlockEntity;
+import com.happysg.radar.block.datalink.DataLinkRenderer;
 import com.happysg.radar.block.monitor.MonitorBlockEntity;
 import com.happysg.radar.block.monitor.MonitorRenderer;
 import com.happysg.radar.block.mount.SmartMountBlockEntity;
@@ -47,7 +48,7 @@ public class ModBlockEntityTypes {
 
     public static final BlockEntityEntry<DataLinkBlockEntity> RADAR_LINK = REGISTRATE
             .blockEntity("data_link", DataLinkBlockEntity::new)
-//            .renderer(() -> DataLinkRenderer::new)
+            .renderer(() -> DataLinkRenderer::new)
             .validBlocks(ModBlocks.RADAR_LINK)
             .register();
 

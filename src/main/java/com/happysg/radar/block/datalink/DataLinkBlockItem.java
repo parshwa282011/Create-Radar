@@ -12,8 +12,6 @@ import com.happysg.radar.block.monitor.MonitorBlockEntity;
 import com.happysg.radar.block.radar.bearing.RadarBearingBlock;
 import com.happysg.radar.block.radar.plane.StationaryRadarBlock;
 import com.happysg.radar.compat.Mods;
-import com.happysg.radar.compat.aeronautics.PhysicsHandler;
-import com.happysg.radar.config.RadarConfig;
 import com.happysg.radar.registry.AllDataBehaviors;
 import com.happysg.radar.registry.ModBlocks;
 import net.createmod.catnip.outliner.Outliner;
@@ -35,7 +33,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -162,17 +159,6 @@ public class DataLinkBlockItem extends BlockItem {
             // Placement position: adjacent to controller on clicked face
             BlockPos placedPos = clickedPos.relative(ctx.getClickedFace(), clickedState.canBeReplaced() ? 0 : 1);
 
-            // Range check: mount + controller must reach the datalink placement
-            double range = RadarConfig.server().radarLinkRange.get();
-            if (!withinRange(level, placedPos, mountPos, range) || !withinRange(level, placedPos, clickedPos, range)) {
-                player.displayClientMessage(
-                        Component.translatable(CreateRadar.MODID+ ".data_link.too_far").withStyle(ChatFormatting.RED),
-                        true
-                );
-                com.happysg.radar.utils.NbtCompat.setTag(stack, null); // user must restart each time
-                return InteractionResult.FAIL;
-            }
-
             // Validate group merge before placement (no mutation)
             WeaponNetworkData.Group group = weaponData.getOrCreateGroup(serverLevel.dimension(), mountPos);
 
@@ -218,6 +204,7 @@ public class DataLinkBlockItem extends BlockItem {
                         dlState.setValue(DataLinkBlock.LINK_STYLE, DataLinkBlock.LinkStyle.CONTROLLER),
                         3);
             }
+            setPlacedLinkTarget(level, placedPos, mountPos);
 
             // Commit now that placement succeeded
             boolean merged = weaponData.tryMergeIntoGroup(group, yawPos, pitchPos, firePos);
@@ -274,17 +261,6 @@ public class DataLinkBlockItem extends BlockItem {
             // adjacent to target on clicked face
             BlockPos placedPos = clickedPos.relative(ctx.getClickedFace(), clickedState.canBeReplaced() ? 0 : 1);
 
-            //  filterer + target must reach datalink
-            double range = RadarConfig.server().radarLinkRange.get();
-            if (!withinRange(level, placedPos, filtererPos, range) || !withinRange(level, placedPos, clickedPos, range)) {
-                player.displayClientMessage(
-                        Component.translatable("display_link.too_far").withStyle(ChatFormatting.RED),
-                        true
-                );
-                com.happysg.radar.utils.NbtCompat.setTag(stack, null);
-                return InteractionResult.FAIL;
-            }
-
             NetworkData filterData = NetworkData.get(serverLevel);
             NetworkData.Group fGroup = filterData.getOrCreateGroup(serverLevel.dimension(), filtererPos);
 
@@ -300,17 +276,6 @@ public class DataLinkBlockItem extends BlockItem {
                 case RADAR_STATIONARY -> canAttach = filterData.canAttachRadar(fGroup, clickedPos, NetworkData.RadarKind.STATIONARY);
 
                 case CONTROLLER -> {
-                    if (!(be instanceof AutoPitchControllerBlockEntity)) {
-                        player.displayClientMessage(
-                                Component.translatable(CreateRadar.MODID + ".data_link.only_pitch_allowed")
-                                        .withStyle(ChatFormatting.RED),
-                                true
-                        );
-                        com.happysg.radar.utils.NbtCompat.setTag(stack, null);
-                        return InteractionResult.FAIL;
-                    }
-
-                    // // Controller MUST already belong to a weapon group for filter networks
                     WeaponNetworkData weaponData = WeaponNetworkData.get(serverLevel);
                     weaponMountPos = weaponData.getMountForController(serverLevel.dimension(), clickedPos);
                     if (weaponMountPos == null) {
@@ -323,7 +288,19 @@ public class DataLinkBlockItem extends BlockItem {
                         return InteractionResult.FAIL;
                     }
 
-                    canAttach = filterData.canAttachWeaponEndpoint(fGroup, clickedPos, weaponMountPos);
+                    BlockPos endpointPos = resolveFilterWeaponEndpoint(serverLevel, clickedPos);
+                    if (endpointPos == null) {
+                        player.displayClientMessage(
+                                Component.translatable(CreateRadar.MODID + ".data_link.only_pitch_allowed")
+                                        .withStyle(ChatFormatting.RED),
+                                true
+                        );
+                        com.happysg.radar.utils.NbtCompat.setTag(stack, null);
+                        return InteractionResult.FAIL;
+                    }
+
+                    clickedPos = endpointPos;
+                    canAttach = filterData.canAttachWeaponEndpoint(fGroup, endpointPos, weaponMountPos);
                 }
 
 
@@ -364,6 +341,7 @@ public class DataLinkBlockItem extends BlockItem {
                         dlState.setValue(DataLinkBlock.LINK_STYLE, DataLinkBlock.LinkStyle.RADAR),
                         3);
             }
+            setPlacedLinkTarget(level, placedPos, filtererPos);
 
             // Commit after placement
             switch (target.kind) {
@@ -423,13 +401,6 @@ public class DataLinkBlockItem extends BlockItem {
 // Helper types / methods
 // -------------------------
 
-    private static boolean withinRange(Level level, BlockPos a, BlockPos b, double range) {
-        Vec3 wa = PhysicsHandler.getWorldPos(level, a).getCenter();
-        Vec3 wb = PhysicsHandler.getWorldPos(level, b).getCenter();
-        return wa.closerThan(wb, range);
-    }
-
-
     private static boolean isCannonMountBE(@Nullable BlockEntity be) {
         if(be instanceof CannonMountBlockEntity)return true;
         if(be instanceof FixedCannonMountBlockEntity) return true;
@@ -488,6 +459,27 @@ public class DataLinkBlockItem extends BlockItem {
         if (getControllerType(be, state) != null) return new FilterTarget(FilterTargetKind.CONTROLLER);
 
         return null;
+    }
+
+    private static @Nullable BlockPos resolveFilterWeaponEndpoint(ServerLevel level, BlockPos clickedPos) {
+        if (level.getBlockEntity(clickedPos) instanceof AutoPitchControllerBlockEntity) {
+            return clickedPos;
+        }
+
+        WeaponNetworkData.WeaponGroupView group =
+                WeaponNetworkData.get(level).getWeaponGroupViewFromEndpoint(level.dimension(), clickedPos);
+        if (group == null || group.pitchPos() == null) {
+            return null;
+        }
+        return group.pitchPos();
+    }
+
+    private static void setPlacedLinkTarget(Level level, BlockPos linkPos, BlockPos targetPos) {
+        if (level.getBlockEntity(linkPos) instanceof DataLinkBlockEntity link) {
+            link.target(targetPos);
+            BlockState state = level.getBlockState(linkPos);
+            level.sendBlockUpdated(linkPos, state, state, 3);
+        }
     }
 
     private static void clearControllersKeepMount(ItemStack stack) {

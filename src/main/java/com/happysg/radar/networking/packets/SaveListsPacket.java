@@ -1,13 +1,22 @@
 package com.happysg.radar.networking.packets;
 
+import com.happysg.radar.CreateRadar;
 import com.happysg.radar.networking.networkhandlers.ListNBTHandler;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class SaveListsPacket {
+public class SaveListsPacket implements CustomPacketPayload {
+    public static final Type<SaveListsPacket> TYPE = new Type<>(CreateRadar.asResource("save_lists"));
+    public static final StreamCodec<FriendlyByteBuf, SaveListsPacket> STREAM_CODEC =
+            StreamCodec.ofMember(SaveListsPacket::encode, SaveListsPacket::decode);
+
     private final List<String> entries;
      final String idString;
     private final boolean isIdString;
@@ -76,6 +85,17 @@ public class SaveListsPacket {
 
 
     /** Handle on the server: call the appropriate ListNBTHandler method **/
-    public static void handle(SaveListsPacket pkt, Object ignored) {
+    public static void handle(SaveListsPacket pkt, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        if (pkt.isIdString) {
+            ListNBTHandler.saveStringToHeldItem(player, pkt.idString);
+        } else {
+            ListNBTHandler.saveToHeldItem(player, pkt.entries);
+        }
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

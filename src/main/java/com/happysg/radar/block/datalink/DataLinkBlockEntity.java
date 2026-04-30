@@ -125,6 +125,7 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     public void target(BlockPos targetPosition) {
         this.targetOffset = targetPosition.subtract(worldPosition);
         setChanged();
+        notifyUpdate();
     }
 
     public BlockPos getSourcePosition() {

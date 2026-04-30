@@ -87,7 +87,7 @@ public class CreateRadar {
         ModLang.register();
         ModPartials.init();
         RadarConfig.register(container);
-        NetworkHandler.register();
+        modEventBus.addListener(NetworkHandler::registerPayloads);
         modEventBus.addListener(CreateRadar::init);
         modEventBus.addListener(CreateRadar::clientInit);
         modEventBus.addListener(CreateRadar::onLoadComplete);

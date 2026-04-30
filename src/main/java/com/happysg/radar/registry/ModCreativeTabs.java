@@ -30,7 +30,6 @@ public class ModCreativeTabs {
 
         CreativeModeTab.Builder tabBuilder = CreativeModeTab.builder()
                 .icon(icon)
-                .displayItems(ModCreativeTabs::displayItems)
                 .title(Component.translatable(itemGroupId))
                 .withTabsBefore(getCreateTabOrFallback());
         
