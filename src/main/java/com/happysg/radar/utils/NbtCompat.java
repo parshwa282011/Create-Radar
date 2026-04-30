@@ -32,12 +32,26 @@ public final class NbtCompat {
         }
     }
 
+    public static CompoundTag writeBlockPos(BlockPos pos) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("X", pos.getX());
+        tag.putInt("Y", pos.getY());
+        tag.putInt("Z", pos.getZ());
+        return tag;
+    }
+
     public static BlockPos readBlockPos(CompoundTag tag) {
         if (tag.contains("X")) {
             return new BlockPos(tag.getInt("X"), tag.getInt("Y"), tag.getInt("Z"));
         }
         if (tag.contains("x")) {
             return new BlockPos(tag.getInt("x"), tag.getInt("y"), tag.getInt("z"));
+        }
+        if (tag.contains("Pos")) {
+            return BlockPos.of(tag.getLong("Pos"));
+        }
+        if (tag.contains("pos")) {
+            return BlockPos.of(tag.getLong("pos"));
         }
         return BlockPos.ZERO;
     }

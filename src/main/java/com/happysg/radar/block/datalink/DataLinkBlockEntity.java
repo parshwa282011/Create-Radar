@@ -1,6 +1,9 @@
 package com.happysg.radar.block.datalink;
 
+import com.happysg.radar.block.behavior.networks.NetworkData;
+import com.happysg.radar.block.behavior.networks.WeaponNetworkData;
 import com.happysg.radar.registry.AllDataBehaviors;
+import com.mojang.logging.LogUtils;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import net.minecraft.core.BlockPos;
@@ -8,13 +11,16 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import org.slf4j.Logger;
 
 public class DataLinkBlockEntity extends SmartBlockEntity {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     protected BlockPos targetOffset = BlockPos.ZERO;
     public DataPeripheral activeSource;
@@ -22,6 +28,9 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
 
     private CompoundTag sourceConfig;
     boolean ledState = false;
+    private boolean lastHadSource;
+    private boolean lastHadTarget;
+    private boolean lastLoggedLedState;
 
     private BlockPos linkedMonitorPos;
 
@@ -41,6 +50,9 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     }
 
     public void updateGatheredData() {
+        if (level.isClientSide)
+            return;
+
         BlockPos sourcePosition = getSourcePosition();
         BlockPos targetPosition = getTargetPosition();
 
@@ -50,6 +62,16 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
         DataController target = AllDataBehaviors.targetOf(level, targetPosition);
         DataPeripheral source = AllDataBehaviors.sourcesOf(level, sourcePosition);
         boolean notify = false;
+        boolean hasSource = source != null;
+        boolean hasTarget = target != null;
+        boolean networkLinked = isLinkedThroughNetworkData();
+
+        if (hasSource != lastHadSource || hasTarget != lastHadTarget || (level.getGameTime() % 100 == 0 && (!hasSource || !hasTarget))) {
+            LOGGER.warn("[RADAR-LINK-BE] pos={} sourcePos={} source={} targetPos={} target={} networkLinked={} facing={} offset={}",
+                    worldPosition, sourcePosition, hasSource, targetPosition, hasTarget, networkLinked, getDirection(), targetOffset);
+            lastHadSource = hasSource;
+            lastHadTarget = hasTarget;
+        }
 
         if (activeTarget != target) {
             activeTarget = target;
@@ -65,14 +87,36 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
         if (notify)
             notifyUpdate();
         if (activeSource == null || activeTarget == null) {
-            ledState = false;
+            setLedState(networkLinked);
             return;
         }
 
-        ledState = true;
+        setLedState(true);
+        if (!lastLoggedLedState) {
+            LOGGER.warn("[RADAR-LINK-BE] ACTIVE pos={} sourcePos={} targetPos={}", worldPosition, sourcePosition, targetPosition);
+            lastLoggedLedState = true;
+        }
         activeSource.transferData(new DataLinkContext(level, this), activeTarget);
         sendData();
         //TODO implement advancement
+    }
+
+    private boolean isLinkedThroughNetworkData() {
+        if (!(level instanceof ServerLevel serverLevel))
+            return false;
+
+        return NetworkData.get(serverLevel).getFiltererForDataLink(serverLevel.dimension(), worldPosition) != null
+                || WeaponNetworkData.get(serverLevel).getMountForDataLink(serverLevel.dimension(), worldPosition) != null;
+    }
+
+    private void setLedState(boolean state) {
+        if (ledState == state)
+            return;
+
+        ledState = state;
+        LOGGER.warn("[RADAR-LINK-BE] led={} pos={} target={}", ledState, worldPosition, getTargetPosition());
+        setChanged();
+        notifyUpdate();
     }
 
     @Override
@@ -91,7 +135,7 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
     }
 
     private void writeGatheredData(CompoundTag tag) {
-        tag.put("TargetOffset", NbtUtils.writeBlockPos(targetOffset));
+        tag.put("TargetOffset", com.happysg.radar.utils.NbtCompat.writeBlockPos(targetOffset));
 
         if (activeSource != null) {
             CompoundTag data = sourceConfig.copy();
@@ -124,6 +168,7 @@ public class DataLinkBlockEntity extends SmartBlockEntity {
 
     public void target(BlockPos targetPosition) {
         this.targetOffset = targetPosition.subtract(worldPosition);
+        LOGGER.warn("[RADAR-LINK-BE] target assigned link={} target={} offset={}", worldPosition, targetPosition, targetOffset);
         setChanged();
         notifyUpdate();
     }

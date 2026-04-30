@@ -63,8 +63,8 @@ public class Binoculars extends SpyglassItem {
             );
 
             CompoundTag tag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(pContext.getItemInHand());
-            tag.put("filterPos", NbtUtils.writeBlockPos(blockEntity.getBlockPos()));
-            tag.put("filtererPos", NbtUtils.writeBlockPos(blockEntity.getBlockPos()));
+            tag.put("filterPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(blockEntity.getBlockPos()));
+            tag.put("filtererPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(blockEntity.getBlockPos()));
             com.happysg.radar.utils.NbtCompat.setTag(pContext.getItemInHand(), tag);
 
             return InteractionResult.SUCCESS;

@@ -13,7 +13,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
@@ -27,9 +29,11 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 
 
 public class MonitorBlock extends HorizontalDirectionalBlock implements IBE<MonitorBlockEntity> {
+    private static final Logger LOGGER = LogUtils.getLogger();
     public static final MapCodec<MonitorBlock> CODEC = simpleCodec(MonitorBlock::new);
 
     @Override
@@ -75,30 +79,64 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements IBE<Moni
         super.onNeighborChange(state, level, pos, neighbor);
     }
 
-    public @NotNull InteractionResult use(@NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull InteractionHand pHand, @NotNull BlockHitResult pHit) {
-        if (!pPlayer.getMainHandItem().isEmpty() || pHand == InteractionHand.OFF_HAND)
-            return InteractionResult.PASS;
-        if(RadarConfig.client().useGuiByDefault.get()){
-            BlockEntity be = pLevel.getBlockEntity(pPos);
-            if (be instanceof MonitorBlockEntity monitor) {
-                if (pLevel.isClientSide) {
-                    openMonitorScreenClient(monitor);
-                }
-                return InteractionResult.sidedSuccess(pLevel.isClientSide);
-            }
-        }
-        if (pPlayer.isShiftKeyDown()) {
-            BlockEntity be = pLevel.getBlockEntity(pPos);
-            if (be instanceof MonitorBlockEntity monitor && isGuiHotspot(monitor, pHit)) {
+    @Override
+    protected @NotNull InteractionResult useWithoutItem(@NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull BlockHitResult pHit) {
+        return handleUse(pState, pLevel, pPos, pPlayer, InteractionHand.MAIN_HAND, pHit, ItemStack.EMPTY);
+    }
 
-                // i only open the GUI on the client
+    @Override
+    protected @NotNull ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull InteractionHand pHand, @NotNull BlockHitResult pHit) {
+        if (!pPlayer.isShiftKeyDown())
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+
+        InteractionResult result = handleUse(pState, pLevel, pPos, pPlayer, pHand, pHit, stack);
+        return switch (result) {
+            case SUCCESS -> ItemInteractionResult.SUCCESS;
+            case CONSUME, CONSUME_PARTIAL -> ItemInteractionResult.CONSUME;
+            case FAIL -> ItemInteractionResult.FAIL;
+            default -> ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        };
+    }
+
+    public @NotNull InteractionResult use(@NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull InteractionHand pHand, @NotNull BlockHitResult pHit) {
+        return handleUse(pState, pLevel, pPos, pPlayer, pHand, pHit, pPlayer.getItemInHand(pHand));
+    }
+
+    private @NotNull InteractionResult handleUse(@NotNull BlockState pState, @NotNull Level pLevel, @NotNull BlockPos pPos, Player pPlayer, @NotNull InteractionHand pHand, @NotNull BlockHitResult pHit, ItemStack heldStack) {
+        if (pHand == InteractionHand.OFF_HAND)
+            return InteractionResult.PASS;
+
+        BlockEntity be = pLevel.getBlockEntity(pPos);
+        LOGGER.warn("[RADAR-MONITOR] use side={} pos={} hand={} held={} shift={} be={} hitFace={} hitPos={}",
+                pLevel.isClientSide ? "client" : "server",
+                pPos,
+                pHand,
+                heldStack,
+                pPlayer.isShiftKeyDown(),
+                be == null ? "null" : be.getClass().getSimpleName(),
+                pHit.getDirection(),
+                pHit.getBlockPos());
+
+        if (be instanceof MonitorBlockEntity monitor) {
+            if (pPlayer.isShiftKeyDown()) {
                 if (pLevel.isClientSide) {
+                    LOGGER.warn("[RADAR-MONITOR] opening screen from shift-click clicked={} controller={}", pPos, monitor.getControllerPos());
                     openMonitorScreenClient(monitor);
-                } else {
+                }
+                return InteractionResult.sidedSuccess(pLevel.isClientSide);
+            }
+            if (heldStack.isEmpty() && RadarConfig.client().useGuiByDefault.get()) {
+                if (pLevel.isClientSide) {
+                    LOGGER.warn("[RADAR-MONITOR] opening screen from default-click clicked={} controller={}", pPos, monitor.getControllerPos());
+                    openMonitorScreenClient(monitor);
                 }
                 return InteractionResult.sidedSuccess(pLevel.isClientSide);
             }
         }
+
+        if (!heldStack.isEmpty())
+            return InteractionResult.PASS;
+
         return onBlockEntityUse(pLevel, pPos, monitorBlockEntity -> MonitorInputHandler.onUse(monitorBlockEntity.getController(), pPlayer, pHand, pHit, pState.getValue(FACING)));
     }
 

@@ -19,6 +19,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,9 +37,12 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import org.jetbrains.annotations.Nullable;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 
 public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements IBE<NetworkFiltererBlockEntity> {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     public NetworkFiltererBlock(Properties properties) {
         super(properties);
@@ -82,12 +86,30 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
         return ModBlockEntityTypes.NETWORK_FILTER_BLOCK_ENTITY.get();
     }
 
+    @Override
+    protected @NotNull InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
+        return removeFilter(state, world, pos, player, hit);
+    }
+
+    @Override
+    protected @NotNull ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        InteractionResult result = useWithItem(state, world, pos, player, hand, hit, stack);
+        return switch (result) {
+            case SUCCESS -> ItemInteractionResult.SUCCESS;
+            case CONSUME, CONSUME_PARTIAL -> ItemInteractionResult.CONSUME;
+            case FAIL -> ItemInteractionResult.FAIL;
+            default -> ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        };
+    }
+
     public @NotNull InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-            ItemStack held = player.getItemInHand(hand);
-        if(held.is(ModItems.BINOCULARS.asItem())){
-            return InteractionResult.SUCCESS;
-        }
-        if (held.isEmpty()) {
+        ItemStack held = player.getItemInHand(hand);
+        if (held.isEmpty())
+            return removeFilter(state, world, pos, player, hit);
+        return useWithItem(state, world, pos, player, hand, hit, held);
+    }
+
+    private @NotNull InteractionResult removeFilter(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
             // client: play hand animation and bail early (server does the work)
             if (world.isClientSide) return InteractionResult.SUCCESS;
 
@@ -173,7 +195,12 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
             world.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 0.6f, 1.0f);
             player.displayClientMessage(Component.translatable(CreateRadar.MODID + ".network_filter.filter_removed").withStyle(ChatFormatting.GOLD), true);
             return InteractionResult.CONSUME;
-        }
+    }
+
+    private @NotNull InteractionResult useWithItem(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit, ItemStack held) {
+            if(held.is(ModItems.BINOCULARS.asItem())){
+                return InteractionResult.SUCCESS;
+            }
             // --- NON-EMPTY HAND: keep existing insertion logic (unchanged)
             if (world.isClientSide) {
                 return InteractionResult.SUCCESS;
@@ -201,6 +228,8 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
                 player.displayClientMessage(Component.translatable(CreateRadar.MODID + ".network_filter.success").withStyle(ChatFormatting.GREEN),true);
             } else {
                 player.displayClientMessage(Component.translatable(CreateRadar.MODID + ".network_filter.invalid").withStyle(ChatFormatting.RED),true);
+                LOGGER.warn("[RADAR-FILTER-BLOCK] invalid insert pos={} held={} tag={}",
+                        pos, heldItem, com.happysg.radar.utils.NbtCompat.getTag(held));
                 return InteractionResult.PASS;
             }
 
@@ -210,6 +239,9 @@ public class NetworkFiltererBlock extends WrenchableDirectionalBlock implements 
             ItemStack toInsert = held.copy();
             toInsert.setCount(1);
             ItemStack remainder = inv.insertItem(targetSlot, toInsert, false);
+            LOGGER.warn("[RADAR-FILTER-BLOCK] insert attempt pos={} slot={} item={} itemTag={} remainder={} existingAfter={}",
+                    pos, targetSlot, heldItem, com.happysg.radar.utils.NbtCompat.getTag(toInsert), remainder,
+                    inv.getStackInSlot(targetSlot));
 
             if (remainder.isEmpty()) {
                 held.shrink(1);

@@ -67,6 +67,9 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
 
     private List<AutoPitchControllerBlockEntity> endpointCache = List.of();
     private long endpointCacheUntilTick = -1;
+    private long lastNoGroupLogTick = -1;
+    private long lastHeadlessLogTick = -1;
+    private long lastNoRadarLogTick = -1;
 
 
     private @Nullable String lastPushedTrackId = null;
@@ -89,9 +92,21 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
     private void headlessTick(ServerLevel sl) {
         NetworkData data = NetworkData.get(sl);
         NetworkData.Group group = data.getGroup(sl.dimension(), worldPosition);
-        if (group == null) return;
+        if (group == null) {
+            if (sl.getGameTime() - lastNoGroupLogTick > 100) {
+                LOGGER.warn("[RADAR-FILTER] no group at {}", worldPosition);
+                lastNoGroupLogTick = sl.getGameTime();
+            }
+            return;
+        }
 
         targeting = readTargetingFromSlot();
+        if (sl.getGameTime() - lastHeadlessLogTick > 40) {
+            LOGGER.warn("[RADAR-FILTER] tick pos={} radar={} monitors={} weapons={} links={} selected={} targeting={} detectionTag={}",
+                    worldPosition, group.radarPos, group.monitorEndpoints.size(), group.weaponEndpoints, group.dataLinks,
+                    group.selectedTargetId, targeting, group.detectionTag);
+            lastHeadlessLogTick = sl.getGameTime();
+        }
 
         // sync radar position + detection
         BlockPos netRadar = group.radarPos;
@@ -105,6 +120,12 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         // resolve radar
         IRadar radar = getRadar(sl);
         if (radar == null || !radar.isRunning()) {
+            if (sl.getGameTime() - lastNoRadarLogTick > 60) {
+                LOGGER.warn("[RADAR-FILTER] no running radar filterer={} radarPos={} be={}",
+                        worldPosition, radarPosCache,
+                        radarPosCache == null ? "null" : String.valueOf(sl.getBlockEntity(radarPosCache)));
+                lastNoRadarLogTick = sl.getGameTime();
+            }
             cachedTracks = List.of();
             activeTrackCache = null;
 
@@ -118,6 +139,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         // rebuild track cache filtered
 
         cachedTracks = radar.getTracks().stream().filter(detectionCache::test).toList();
+        LOGGER.warn("[RADAR-FILTER] radar tracks filterer={} raw={} filtered={}",
+                worldPosition, radar.getTracks().size(), cachedTracks.size());
 
         // resolve current selected track from group.selectedTargetId
         RadarTrack selected = resolveSelectedTrack(group.selectedTargetId);
@@ -258,6 +281,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         this.activeTrackCache = track;
         List<AutoPitchControllerBlockEntity> entities = (level instanceof ServerLevel sl) ? getWeaponEndpointsCached(sl) : List.of();
         for (AutoPitchControllerBlockEntity pitch : entities) {
+            LOGGER.warn("[RADAR-FILTER] push endpoint filterer={} pitch={} track={} cfg={}",
+                    worldPosition, pitch.getBlockPos(), track == null ? "null" : track.getId(), cfg);
 
             pitch.setAndAcquireTrack(track, cfg);
             pitch.setSafeZones(safeZones);
@@ -374,6 +399,8 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
             CompoundTag tag = com.happysg.radar.utils.NbtCompat.getTag(s);
             slotNbt[slot] = tag == null ? null : tag.copy();
         }
+        LOGGER.warn("[RADAR-FILTER-BE] slot nbt sync pos={} slot={} stack={} tag={}",
+                worldPosition, slot, s == null ? "null" : s.getItem(), slotNbt[slot]);
     }
 
 
@@ -535,6 +562,24 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         if (!list.isEmpty()) {
             nbt.put(NBT_SLOT_NBT, list);
         }
+        LOGGER.warn("[RADAR-FILTER-BE] save slot nbt pos={} entries={}", worldPosition, list.size());
+    }
+
+    private void restoreSlotNbtToInventory() {
+        for (int i = 0; i < inventory.getSlots(); i++) {
+            ItemStack stack = inventory.getStackInSlot(i);
+            CompoundTag saved = slotNbt[i];
+            if (stack.isEmpty() || saved == null || saved.isEmpty())
+                continue;
+
+            if (!com.happysg.radar.utils.NbtCompat.hasTag(stack)) {
+                ItemStack restored = stack.copy();
+                com.happysg.radar.utils.NbtCompat.setTag(restored, saved.copy());
+                inventory.setStackInSlot(i, restored);
+                LOGGER.warn("[RADAR-FILTER-BE] restored missing item nbt pos={} slot={} tag={}",
+                        worldPosition, i, saved);
+            }
+        }
     }
 
     // Legacy loader: old worlds had { slotTags: {slot0:{}, slot1:{}, ... } }
@@ -555,9 +600,14 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag nbt, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(nbt, registries);
+        for (int i = 0; i < inventory.getSlots(); i++) {
+            updateSlotNbtFromInventory(i);
+        }
         nbt.put(NBT_INVENTORY, inventory.serializeNBT(registries));
         saveSlotNbt(nbt);
         nbt.putLong("LastKnownPos", lastKnownPos.asLong());
+        LOGGER.warn("[RADAR-FILTER-BE] save pos={} inv={} slotNbt={}",
+                worldPosition, inventorySnapshot(), Arrays.toString(slotNbt));
     }
 
 
@@ -587,10 +637,23 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         } else {
             loadLegacySlotTags(nbt);
         }
+        restoreSlotNbtToInventory();
         for (int i = 0; i < inventory.getSlots(); i++) {
             updateSlotNbtFromInventory(i);
         }
+        LOGGER.warn("[RADAR-FILTER-BE] load pos={} inv={} slotNbt={}",
+                worldPosition, inventorySnapshot(), Arrays.toString(slotNbt));
 
+    }
+
+    private String inventorySnapshot() {
+        List<String> stacks = new ArrayList<>();
+        for (int i = 0; i < inventory.getSlots(); i++) {
+            ItemStack stack = inventory.getStackInSlot(i);
+            stacks.add(i + ":" + (stack.isEmpty() ? "empty" : stack.getItem() + "x" + stack.getCount()
+                    + " tag=" + com.happysg.radar.utils.NbtCompat.getTag(stack)));
+        }
+        return stacks.toString();
     }
 
     // Sync to client
@@ -632,20 +695,32 @@ public class NetworkFiltererBlockEntity extends BlockEntity {
         NetworkData.Group group = data.getOrCreateGroup(sl.dimension(), worldPosition);
 
         data.setAllFilters(group, targeting, ident, detection);
+        LOGGER.warn("[RADAR-FILTER] apply filters pos={} targeting={} ident={} detection={} radar={} weapons={} monitors={} links={}",
+                worldPosition, targeting, ident, detection, group.radarPos, group.weaponEndpoints, group.monitorEndpoints, group.dataLinks);
         applyDetectionToRadar(sl, group, detection);
     }
 
     private void applyDetectionToRadar(ServerLevel sl, NetworkData.Group group, DetectionConfig detection) {
         // group needs to know where the radar is
-        if (group.radarPos == null) return;
+        if (group.radarPos == null) {
+            LOGGER.warn("[RADAR-FILTER] applyDetection skipped: no radar filterer={}", worldPosition);
+            return;
+        }
 
         BlockEntity be = sl.getBlockEntity(group.radarPos);
-        if (!(be instanceof SmartBlockEntity sbe)) return;
+        if (!(be instanceof SmartBlockEntity sbe)) {
+            LOGGER.warn("[RADAR-FILTER] applyDetection skipped: radar BE not SmartBlockEntity radar={} be={}", group.radarPos, be);
+            return;
+        }
 
         RadarScanningBlockBehavior scan = BlockEntityBehaviour.get(sbe, RadarScanningBlockBehavior.TYPE);
-        if (scan == null) return;
+        if (scan == null) {
+            LOGGER.warn("[RADAR-FILTER] applyDetection skipped: no scan behavior radar={}", group.radarPos);
+            return;
+        }
 
         scan.applyDetectionConfig(detection);
+        LOGGER.warn("[RADAR-FILTER] applied detection filterer={} radar={} detection={}", worldPosition, group.radarPos, detection);
     }
 
     private DetectionConfig readDetectionFromSlot() {

@@ -53,7 +53,7 @@ public class SafeZoneDesignatorItem extends Item {
         }
         boolean isCrouching = player.isCrouching();
         if (level.getBlockEntity(pos) instanceof MonitorBlockEntity monitorBlockEntity) {
-            data.put("monitorPos", NbtUtils.writeBlockPos(monitorBlockEntity.getControllerPos()));
+            data.put("monitorPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(monitorBlockEntity.getControllerPos()));
             displayMessage(player, CreateRadar.MODID + ".item.safe_zone_designator.set", ChatFormatting.GREEN);
             return InteractionResult.SUCCESS;
         }
@@ -71,7 +71,7 @@ public class SafeZoneDesignatorItem extends Item {
                     return InteractionResult.SUCCESS;
                 }
             }
-            data.put("startPos", NbtUtils.writeBlockPos(pos));
+            data.put("startPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(pos));
             displayMessage(player, CreateRadar.MODID + ".item.safe_zone_designator.start", ChatFormatting.GREEN);
         } else {
             if (player.isCrouching()) {

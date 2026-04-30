@@ -91,9 +91,17 @@ public class DataLinkBlock extends WrenchableDirectionalBlock implements IBE<Dat
 
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (state.getBlock() == newState.getBlock()) {
+            super.onRemove(state, level, pos, newState, isMoving);
+            return;
+        }
+
         if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
             ResourceKey<Level> dim = serverLevel.dimension();
             Direction supportFace = state.getValue(FACING);
+
+            LOGGER.warn("[RADAR-LINK] removing link pos={} style={} supportEndpoint={}",
+                    pos, state.getValue(LINK_STYLE), pos.relative(supportFace.getOpposite()));
 
             NetworkData.get(serverLevel).removeDataLinkAndCleanup(dim, pos, serverLevel);
             WeaponNetworkData.get(serverLevel).removeDataLinkAndCleanup(dim, pos);

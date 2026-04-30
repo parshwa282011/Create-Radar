@@ -13,11 +13,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
+import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.*;
 
 public class WeaponNetworkData extends SavedData {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /** A group is uniquely identified by its mount location (dim + pos). */
     public record MountKey(ResourceKey<Level> dim, BlockPos mountPos) {}
@@ -200,17 +203,17 @@ public class WeaponNetworkData extends SavedData {
         for (Group group : groupsByMount.values()) {
             CompoundTag g = new CompoundTag();
             g.putString("Dim", group.key.dim().location().toString());
-            g.put("MountPos", NbtUtils.writeBlockPos(group.key.mountPos()));
+            g.put("MountPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.key.mountPos()));
 
-            if (group.yawPos != null) g.put("YawPos", NbtUtils.writeBlockPos(group.yawPos));
-            if (group.pitchPos != null) g.put("PitchPos", NbtUtils.writeBlockPos(group.pitchPos));
-            if (group.firingPos != null) g.put("FiringPos", NbtUtils.writeBlockPos(group.firingPos));
+            if (group.yawPos != null) g.put("YawPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.yawPos));
+            if (group.pitchPos != null) g.put("PitchPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.pitchPos));
+            if (group.firingPos != null) g.put("FiringPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.firingPos));
 
             g.put("Targeting", group.targetingTag);
 
             ListTag links = new ListTag();
             for (BlockPos p : group.dataLinks) {
-                links.add(NbtUtils.writeBlockPos(p));
+                links.add(com.happysg.radar.utils.NbtCompat.writeBlockPos(p));
             }
             g.put("DataLinks", links);
 
@@ -232,6 +235,7 @@ public class WeaponNetworkData extends SavedData {
     public Group getOrCreateGroup(ResourceKey<Level> dim, BlockPos mountPos) {
         String k = key(dim, mountPos);
         return groupsByMount.computeIfAbsent(k, _k -> {
+            LOGGER.warn("[RADAR-WEAPON-NET] create group mount={} dim={}", mountPos, dim.location());
             setDirty();
             return new Group(new MountKey(dim, mountPos));
         });
@@ -244,6 +248,13 @@ public class WeaponNetworkData extends SavedData {
     /** Fast lookup: which mount group owns this controller? */
     public @Nullable BlockPos getMountForController(ResourceKey<Level> dim, BlockPos controllerPos) {
         String mk = controllerToMount.get(key(dim, controllerPos));
+        if (mk == null) return null;
+        return posFromKey(mk);
+    }
+
+    /** Fast lookup: which mount group owns this data link block? */
+    public @Nullable BlockPos getMountForDataLink(ResourceKey<Level> dim, BlockPos dataLinkPos) {
+        String mk = dataLinkToMount.get(key(dim, dataLinkPos));
         if (mk == null) return null;
         return posFromKey(mk);
     }
@@ -286,6 +297,8 @@ public class WeaponNetworkData extends SavedData {
             controllerToMount.put(key(dim, firing), mountKey);
         }
 
+        LOGGER.warn("[RADAR-WEAPON-NET] merge mount={} yaw={} pitch={} fire={} controllers yaw={} pitch={} fire={}",
+                group.key.mountPos(), yaw, pitch, firing, group.yawPos, group.pitchPos, group.firingPos);
         setDirty();
         return true;
     }
@@ -296,6 +309,8 @@ public class WeaponNetworkData extends SavedData {
 
         group.dataLinks.add(dataLinkPos);
         dataLinkToMount.put(key(dim, dataLinkPos), mountKey);
+        LOGGER.warn("[RADAR-WEAPON-NET] add datalink mount={} link={} links={}",
+                group.key.mountPos(), dataLinkPos, group.dataLinks);
         setDirty();
     }
 
@@ -341,6 +356,7 @@ public class WeaponNetworkData extends SavedData {
     public void removeDataLinkAndCleanup(ResourceKey<Level> dim, BlockPos dataLinkPos) {
         String dlKey = key(dim, dataLinkPos);
         String mountKey = dataLinkToMount.remove(dlKey);
+        LOGGER.warn("[RADAR-WEAPON-NET] remove datalink link={} mountKey={}", dataLinkPos, mountKey);
         if (mountKey == null) return;
 
         Group group = groupsByMount.get(mountKey);

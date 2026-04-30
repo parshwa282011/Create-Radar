@@ -12,8 +12,10 @@ import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BehaviourType;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.happysg.radar.block.behavior.networks.config.DetectionConfig;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -22,11 +24,14 @@ import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.slf4j.Logger;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
 public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     public static final BehaviourType<RadarScanningBlockBehavior> TYPE = new BehaviourType<>();
 
@@ -39,6 +44,8 @@ public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
     private SmartBlockEntity bearingEntity;
     private RadarBearingBlockEntity radarBearing;
     Vec3 scanPos = Vec3.ZERO;
+    private long lastAeroLogTick = -1;
+    private long lastAeroErrorLogTick = -1;
 
     private final Set<Entity> scannedEntities = new HashSet<>();
     private final Set<Projectile> scannedProjectiles = new HashSet<>();
@@ -70,6 +77,9 @@ public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
     private boolean scanAnimals = true;
     private boolean scanProjectiles = true;
     private boolean scanItems = true;
+    private double lastAeroHorizontalDistance = -1;
+    private double lastAeroVerticalDistance = -1;
+    private Vec3 lastAeroPos = null;
 
     private boolean allowCategory(TrackCategory c) {
         return switch (c) {
@@ -127,8 +137,6 @@ public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
     private void updateRadarTracks() {
         scanPos = PhysicsHandler.getWorldPos(bearingEntity).getCenter();
         Level level = blockEntity.getLevel();
-        boolean isServer = level instanceof net.minecraft.server.level.ServerLevel;
-        net.minecraft.server.level.ServerLevel sl = isServer ? (net.minecraft.server.level.ServerLevel) level : null;
         if (level == null )return;
 
 
@@ -145,6 +153,103 @@ public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
             }
         }
 
+        if (level instanceof ServerLevel sl && scanVS2) {
+            scanForAeronauticsTracks(sl);
+        }
+    }
+
+    private void scanForAeronauticsTracks(ServerLevel level) {
+        try {
+            Class<?> containerClass = Class.forName("dev.ryanhcode.sable.api.sublevel.SubLevelContainer");
+            Object container = containerClass.getMethod("getContainer", ServerLevel.class).invoke(null, level);
+            if (container == null) return;
+
+            Method getAllSubLevels = container.getClass().getMethod("getAllSubLevels");
+            Iterable<?> subLevels = (Iterable<?>) getAllSubLevels.invoke(container);
+
+            int considered = 0;
+            int accepted = 0;
+            long now = level.getGameTime();
+
+            for (Object subLevel : subLevels) {
+                if (subLevel == null) continue;
+                if ((boolean) subLevel.getClass().getMethod("isRemoved").invoke(subLevel)) continue;
+                considered++;
+
+                Object bounds = subLevel.getClass().getMethod("boundingBox").invoke(subLevel);
+                double minX = getDouble(bounds, "minX");
+                double minY = getDouble(bounds, "minY");
+                double minZ = getDouble(bounds, "minZ");
+                double maxX = getDouble(bounds, "maxX");
+                double maxY = getDouble(bounds, "maxY");
+                double maxZ = getDouble(bounds, "maxZ");
+                Vec3 pos = new Vec3(
+                        (minX + maxX) * 0.5,
+                        (minY + maxY) * 0.5,
+                        (minZ + maxZ) * 0.5
+                );
+
+                if (!isAeroSubLevelInRange(minX, minY, minZ, maxX, maxY, maxZ, pos)) continue;
+
+                Field velocityField = subLevel.getClass().getField("latestLinearVelocity");
+                Object latestLinearVelocity = velocityField.get(subLevel);
+                Vec3 velocity = new Vec3(
+                        getDouble(latestLinearVelocity, "x"),
+                        getDouble(latestLinearVelocity, "y"),
+                        getDouble(latestLinearVelocity, "z")
+                );
+                String id = subLevel.getClass().getMethod("getUniqueId").invoke(subLevel).toString();
+                float height = (float) Math.max(1.0, maxY - minY);
+
+                radarTracks.put(id, new RadarTrack(id, pos, velocity, now, TrackCategory.AERONAUTICS, "CreateAero:ship", height));
+                RadarContactRegistry.markInRange(level, id.hashCode(), trackExpiration);
+                accepted++;
+            }
+
+            if (now - lastAeroLogTick > 40) {
+                LOGGER.warn("[RADAR-AERO] scan radar={} considered={} accepted={} scanPos={} lastPos={} horiz={} vertical={} range={} aeroYRange={} angle={} fov={}",
+                        blockEntity.getBlockPos(), considered, accepted, scanPos, lastAeroPos,
+                        lastAeroHorizontalDistance, lastAeroVerticalDistance, range,
+                        aeroVerticalRange(), angle, fov);
+                lastAeroLogTick = now;
+            }
+        } catch (Throwable t) {
+            long now = level.getGameTime();
+            if (now - lastAeroErrorLogTick > 100) {
+                LOGGER.warn("[RADAR-AERO] failed to scan Create Aeronautics sublevels radar={}: {}",
+                        blockEntity.getBlockPos(), t.toString());
+                lastAeroErrorLogTick = now;
+            }
+        }
+    }
+
+    private static double getDouble(Object object, String methodName) throws ReflectiveOperationException {
+        return ((Number) object.getClass().getMethod(methodName).invoke(object)).doubleValue();
+    }
+
+    private boolean isAeroSubLevelInRange(double minX, double minY, double minZ, double maxX, double maxY, double maxZ, Vec3 center) {
+        double closestX = clamp(scanPos.x(), minX, maxX);
+        double closestY = clamp(scanPos.y(), minY, maxY);
+        double closestZ = clamp(scanPos.z(), minZ, maxZ);
+
+        double dx = closestX - scanPos.x();
+        double dz = closestZ - scanPos.z();
+        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+        double verticalDistance = Math.abs(closestY - scanPos.y());
+
+        lastAeroHorizontalDistance = horizontalDistance;
+        lastAeroVerticalDistance = verticalDistance;
+        lastAeroPos = center;
+
+        return horizontalDistance <= range && verticalDistance <= aeroVerticalRange();
+    }
+
+    private double aeroVerticalRange() {
+        return Math.max(RadarConfig.server().radarYScanRange.get(), 64.0);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private boolean isInFovAndRange(Vec3 target) {
@@ -195,7 +300,7 @@ public class RadarScanningBlockBehavior extends BlockEntityBehaviour {
         if (level == null) return;
 
         boolean scanAll =
-                scanPlayers && scanContraptions && scanMobs && scanAnimals && scanProjectiles && scanItems;
+                scanPlayers && scanVS2 && scanContraptions && scanMobs && scanAnimals && scanProjectiles && scanItems;
 
         for (AABB aabb : splitAABB(getRadarAABB(), 256)) {
             if (scanAll) {

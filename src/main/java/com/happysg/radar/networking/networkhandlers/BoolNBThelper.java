@@ -12,6 +12,7 @@ public final class BoolNBThelper {
         byte[] arr = new byte[flags.length];
         for (int i = 0; i < flags.length; i++) arr[i] = (byte) (flags[i] ? 1 : 0);
         tag.putByteArray(key, arr);
+        com.happysg.radar.utils.NbtCompat.setTag(stack, tag);
     }
 
     public static boolean[] loadBooleansFromBytes(ItemStack stack, String key, int expectedLength) {
@@ -33,4 +34,3 @@ public final class BoolNBThelper {
         System.arraycopy(tmp, 0, dest, 0, Math.min(tmp.length, dest.length));
     }
 }
-

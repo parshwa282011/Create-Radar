@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "create_radar:block/stationary_radar",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "create_radar:block/stationary_radar",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "create_radar:block/stationary_radar"
+    },
+    "facing=west": {
+      "model": "create_radar:block/stationary_radar",
+      "y": 90
+    }
+  }
+}

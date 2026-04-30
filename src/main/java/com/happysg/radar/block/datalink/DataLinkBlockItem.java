@@ -96,7 +96,7 @@ public class DataLinkBlockItem extends BlockItem {
         boolean isEnergyMount = Mods.CREATEENERGYCANNONS.isLoaded() && clickedState.getBlock() instanceof EnergyCannonMount;
         if (clickedState.getBlock() instanceof CannonMountBlock || isEnergyMount) {
             if (!level.isClientSide) {
-                tag.put("SelectedMountPos", NbtUtils.writeBlockPos(clickedPos));
+                tag.put("SelectedMountPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(clickedPos));
                 // Ensure other mode is cleared
                 tag.remove("SelectedFiltererPos");
 
@@ -116,7 +116,7 @@ public class DataLinkBlockItem extends BlockItem {
         // ==========================================
         if (clickedState.getBlock() instanceof NetworkFiltererBlock) {
             if (!level.isClientSide) {
-                tag.put("SelectedFiltererPos", NbtUtils.writeBlockPos(clickedPos));
+                tag.put("SelectedFiltererPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(clickedPos));
                 // Ensure other mode is cleared
                 tag.remove("SelectedMountPos");
                 // Clear any controller picks
@@ -205,6 +205,8 @@ public class DataLinkBlockItem extends BlockItem {
                         3);
             }
             setPlacedLinkTarget(level, placedPos, mountPos);
+            CreateRadar.getLogger().warn("[RADAR-LINK-ITEM] weapon placement mount={} controller={} type={} link={}",
+                    mountPos, clickedPos, controllerType, placedPos);
 
             // Commit now that placement succeeded
             boolean merged = weaponData.tryMergeIntoGroup(group, yawPos, pitchPos, firePos);
@@ -219,6 +221,8 @@ public class DataLinkBlockItem extends BlockItem {
             }
 
             weaponData.addDataLinkToGroup(group, placedPos);
+            CreateRadar.getLogger().warn("[RADAR-LINK-ITEM] weapon commit mount={} yaw={} pitch={} fire={} link={}",
+                    mountPos, group.yawPos, group.pitchPos, group.firingPos, placedPos);
 
             player.displayClientMessage(
                     Component.translatable("display_link.success").withStyle(ChatFormatting.GREEN),
@@ -342,6 +346,8 @@ public class DataLinkBlockItem extends BlockItem {
                         3);
             }
             setPlacedLinkTarget(level, placedPos, filtererPos);
+            CreateRadar.getLogger().warn("[RADAR-LINK-ITEM] filter placement filterer={} endpoint={} kind={} link={} mount={}",
+                    filtererPos, clickedPos, target.kind, placedPos, weaponMountPos);
 
             // Commit after placement
             switch (target.kind) {
@@ -376,6 +382,8 @@ public class DataLinkBlockItem extends BlockItem {
             }
 
             filterData.addDataLinkToGroup(fGroup, placedPos,clickedPos); // Might be issue later
+            CreateRadar.getLogger().warn("[RADAR-LINK-ITEM] filter commit filterer={} radar={} radarKind={} monitors={} weapons={} link={}",
+                    filtererPos, fGroup.radarPos, fGroup.radarKind, fGroup.monitorEndpoints, fGroup.weaponEndpoints, placedPos);
 
             player.displayClientMessage(
                     Component.translatable("display_link.success").withStyle(ChatFormatting.GREEN),

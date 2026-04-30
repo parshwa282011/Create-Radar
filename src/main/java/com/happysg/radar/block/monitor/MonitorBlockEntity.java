@@ -514,7 +514,7 @@ public class MonitorBlockEntity extends SmartBlockEntity implements IHaveHoverin
         super.write(tag, registries, clientPacket);
 
         if (controller != null)
-            tag.put("Controller", NbtUtils.writeBlockPos(controller));
+            tag.put("Controller", com.happysg.radar.utils.NbtCompat.writeBlockPos(controller));
 
         if (selectedEntity != null) tag.putString("SelectedEntity", selectedEntity);
         if (hoveredEntity != null) tag.putString("HoveredEntity", hoveredEntity);
@@ -525,7 +525,7 @@ public class MonitorBlockEntity extends SmartBlockEntity implements IHaveHoverin
             tag.putBoolean("HasRadarPos", radarPos != null);
 
             if (radarPos != null)
-                tag.put("radarPos", NbtUtils.writeBlockPos(radarPos));
+                tag.put("radarPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(radarPos));
 
             tag.put("Filter", filter.toTag());
             tag.put("tracks", RadarTrackUtil.serializeNBTList(cachedTracks));
@@ -533,7 +533,7 @@ public class MonitorBlockEntity extends SmartBlockEntity implements IHaveHoverin
             if (level instanceof ServerLevel slevel) {
                 if (getNetworkGroup(slevel) == null) {
                     if (radarPos != null)
-                        tag.put("radarPos", NbtUtils.writeBlockPos(radarPos));
+                        tag.put("radarPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(radarPos));
                     tag.put("Filter", filter.toTag());
                 }
             }

@@ -13,6 +13,7 @@ import rbasamoyai.createbigcannons.cannon_control.contraption.AbstractMountedCan
 import rbasamoyai.createbigcannons.cannon_control.contraption.PitchOrientedContraptionEntity;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.Method;
 import java.util.List;
 
 public class CannonMountPitch {
@@ -51,7 +52,8 @@ public class CannonMountPitch {
         int invert = -cannonContraption.initialOrientation().getStepX() + cannonContraption.initialOrientation().getStepZ();
         currentPitch = currentPitch * -invert;
 
-        return Math.abs(currentPitch - controller.getTargetAngle()) < tol;
+        double targetPitch = clampToCbcPitchLimits(mount, controller.getTargetAngle());
+        return Math.abs(currentPitch - targetPitch) < tol;
     }
 
     public double getMaxEngagementRangeBlocks(CannonMountBlockEntity mount, ServerLevel sl) {
@@ -123,7 +125,8 @@ public class CannonMountPitch {
         int invert = -cannonContraption.initialOrientation().getStepX() + cannonContraption.initialOrientation().getStepZ();
         currentPitch = currentPitch * -invert;
 
-        double diff = controller.getTargetAngle() - currentPitch;
+        double targetPitch = clampToCbcPitchLimits(mount, controller.getTargetAngle());
+        double diff = targetPitch - currentPitch;
 
         double nearDeadbandDeg = AutoPitchControllerBlockEntity.getCbcTolerance();
         if (controller.firingControl != null) {
@@ -140,14 +143,14 @@ public class CannonMountPitch {
         LOGGER.debug(
                 "PITCH.rotateCBC current={} target={} diff={} speed={} deadband={}",
                 currentPitch,
-                controller.getTargetAngle(),
+                targetPitch,
                 diff,
                 controller.getSpeed(),
                 nearDeadbandDeg
         );
 
         if (Math.abs(diff) <= nearDeadbandDeg) {
-            mount.setPitch((float) controller.getTargetAngle());
+            mount.setPitch((float) targetPitch);
             mount.notifyUpdate();
             return;
         }
@@ -184,16 +187,73 @@ public class CannonMountPitch {
             return;
         }
 
-        if (controller.isArtillery() && angles.size() == 2) {
-            controller.setInternalTargetAngle(angles.get(1));
-        } else if (!angles.isEmpty()) {
-            controller.setInternalTargetAngle(angles.get(0));
+        Double targetAngle = chooseReachablePitch(mount, angles);
+        if (targetAngle == null) {
+            LOGGER.debug("PITCH.solve FAILED: roots outside mount limits angles={} limits={}", angles, describeCbcPitchLimits(mount));
+            controller.setRunning(false);
+            return;
         }
 
-        LOGGER.debug("PITCH.solve targetAngle={}", controller.getTargetAngle());
+        controller.setInternalTargetAngle(targetAngle);
+        LOGGER.debug("PITCH.solve targetAngle={} rawAngles={} limits={}", controller.getTargetAngle(), angles, describeCbcPitchLimits(mount));
 
         controller.setRunning(true);
         controller.notifyUpdate();
         controller.setChanged();
+    }
+
+    @Nullable
+    private Double chooseReachablePitch(CannonMountBlockEntity mount, List<Double> angles) {
+        double min = getCbcMinPitch(mount);
+        double max = getCbcMaxPitch(mount);
+        Double firstReachable = null;
+
+        for (Double angle : angles) {
+            if (angle == null || !Double.isFinite(angle)) {
+                continue;
+            }
+            if (angle >= min && angle <= max) {
+                if (!controller.isArtillery()) {
+                    return angle;
+                }
+                firstReachable = angle;
+            }
+        }
+
+        if (controller.isArtillery() && firstReachable != null) {
+            return firstReachable;
+        }
+
+        return null;
+    }
+
+    private double clampToCbcPitchLimits(CannonMountBlockEntity mount, double pitch) {
+        return Math.max(getCbcMinPitch(mount), Math.min(getCbcMaxPitch(mount), pitch));
+    }
+
+    private double getCbcMinPitch(CannonMountBlockEntity mount) {
+        return Math.max(controller.getMinAngleDeg(), -invokeCbcPitchLimit(mount, "getMaxDepress", 45.0));
+    }
+
+    private double getCbcMaxPitch(CannonMountBlockEntity mount) {
+        return Math.min(controller.getMaxAngleDeg(), invokeCbcPitchLimit(mount, "getMaxElevate", 60.0));
+    }
+
+    private double invokeCbcPitchLimit(CannonMountBlockEntity mount, String methodName, double fallback) {
+        try {
+            Method method = CannonMountBlockEntity.class.getDeclaredMethod(methodName);
+            method.setAccessible(true);
+            Object value = method.invoke(mount);
+            if (value instanceof Number number) {
+                return Math.max(0.0, number.doubleValue());
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            LOGGER.warn("PITCH.limit failed method={} mount={} err={}", methodName, mount.getBlockPos(), e.toString());
+        }
+        return fallback;
+    }
+
+    private String describeCbcPitchLimits(CannonMountBlockEntity mount) {
+        return "[" + getCbcMinPitch(mount) + ", " + getCbcMaxPitch(mount) + "]";
     }
 }

@@ -24,6 +24,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Collection;
 import java.util.UUID;
@@ -44,12 +45,13 @@ public class MonitorScreen extends Screen {
     private static final float ALPHA_BACKGROUND = 0.6f;
     private static final float ALPHA_GRID = 0.1f;
     private static final float ALPHA_SWEEP = 0.8f;
-    private static final int TARGET_BG =512;
-    // i treat 512px as the "design resolution" of the monitor ui
+    private static final int RADAR_BG_TEXTURE_PX = 128;
+    private static final int TRACK_TEXTURE_PX = 256;
+    // The radar canvas is deliberately large; pan the viewport instead of shrinking it into blur.
     private static final int TARGET_UI_PX = 900;
     private static final int GRID_MARGIN_PX = 21;
+    private static final int PAN_STEP = 48;
 
-    // i store the current ui size in gui units, and a scale factor relative to the old 512 design
     private int uiSize;
     private float uiScale;
 
@@ -57,6 +59,15 @@ public class MonitorScreen extends Screen {
 
     private int left;
     private int top;
+    private int viewportLeft;
+    private int viewportTop;
+    private int viewportSize;
+    private int panX;
+    private int panY;
+    private boolean centeredInitialPan;
+    private boolean panning;
+    private double lastDragX;
+    private double lastDragY;
 
     private String hoveredId;
 
@@ -68,17 +79,13 @@ public class MonitorScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        recalcUiScale();
-        left = (this.width - uiSize) / 2;
-        top = (this.height - uiSize) / 2;
+        recalcUiLayout();
     }
 
     @Override
     public void resize(Minecraft mc, int w, int h) {
         super.resize(mc, w, h);
-        recalcUiScale();
-        left = (this.width - uiSize) / 2;
-        top = (this.height - uiSize) / 2;
+        recalcUiLayout();
     }
 
     @Override
@@ -86,24 +93,38 @@ public class MonitorScreen extends Screen {
         return false;
     }
 
-    private void recalcUiScale() {
-        Minecraft mc = Minecraft.getInstance();
-
-        double s = mc.getWindow().getGuiScale();
-        if (s <= 0) s = 1;
-
-        uiSize = (int) Math.round(TARGET_UI_PX / s);
-
-        int max = Math.min(this.width, this.height) - 20;
-        uiSize = Mth.clamp(uiSize, 120, Math.max(120, max));
-
+    private void recalcUiLayout() {
+        uiSize = TARGET_UI_PX;
         uiScale = uiSize / 512f;
+
+        int available = Math.min(this.width - 20, this.height - 44);
+        viewportSize = Mth.clamp(available, 120, uiSize);
+        viewportLeft = (this.width - viewportSize) / 2;
+        viewportTop = (this.height - viewportSize) / 2;
+
+        if (!centeredInitialPan) {
+            panX = Math.max(0, (uiSize - viewportSize) / 2);
+            panY = Math.max(0, (uiSize - viewportSize) / 2);
+            centeredInitialPan = true;
+        }
+
+        clampPan();
+        updateCanvasOrigin();
+    }
+
+    private void updateCanvasOrigin() {
+        left = viewportLeft - panX;
+        top = viewportTop - panY;
+    }
+
+    private void clampPan() {
+        panX = Mth.clamp(panX, 0, Math.max(0, uiSize - viewportSize));
+        panY = Mth.clamp(panY, 0, Math.max(0, uiSize - viewportSize));
     }
 
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTicks) {
         renderBackground(gg, mouseX, mouseY, partialTicks);
-        drawPanelBackground(gg);
 
         MonitorBlockEntity monitor = getController();
         if (monitor == null) {
@@ -127,32 +148,31 @@ public class MonitorScreen extends Screen {
 
         updateHoverFromMouse(monitor, radar, mouseX, mouseY);
 
+        gg.enableScissor(viewportLeft, viewportTop, viewportLeft + viewportSize, viewportTop + viewportSize);
+        drawPanelBackground(gg);
         renderGrid(gg, monitor, monitor.radar);
         renderBG(gg, monitor, MonitorSprite.RADAR_BG_FILLER, ALPHA_BACKGROUND);
         renderBG(gg, monitor, MonitorSprite.RADAR_BG_CIRCLE, ALPHA_BACKGROUND);
         renderSweep(gg, monitor, radar, partialTicks);
         renderTracks(gg, monitor, radar);
+        gg.disableScissor();
+        drawViewportFrame(gg);
 
-        gg.drawCenteredString(font, Component.translatable(CLICK_HINT_KEY), width / 2, top + uiSize + 6, 0xA0A0A0);
+        gg.drawCenteredString(font, Component.translatable(CLICK_HINT_KEY), width / 2, viewportTop + viewportSize + 6, 0xA0A0A0);
 
         super.render(gg, mouseX, mouseY, partialTicks);
     }
 
     private void drawPanelBackground(GuiGraphics gg) {
-        RenderSystem.enableBlend();
+        gg.fill(left, top, left + uiSize, top + uiSize, 0xF0030808);
+    }
 
-        // i draw the background using the same uiSize the rest of the screen uses
-        gg.blit(
-                CreateRadar.asResource("textures/gui/monitor_gui.png"),
-                left,
-                top,
-                0, 0,
-                uiSize,   // destination width
-                uiSize,   // destination height
-                uiSize,uiSize  // actual texture size in pixels
-        );
-
-        RenderSystem.disableBlend();
+    private void drawViewportFrame(GuiGraphics gg) {
+        int c = 0xFF46FFD8;
+        gg.fill(viewportLeft - 1, viewportTop - 1, viewportLeft + viewportSize + 1, viewportTop, c);
+        gg.fill(viewportLeft - 1, viewportTop + viewportSize, viewportLeft + viewportSize + 1, viewportTop + viewportSize + 1, c);
+        gg.fill(viewportLeft - 1, viewportTop, viewportLeft, viewportTop + viewportSize, c);
+        gg.fill(viewportLeft + viewportSize, viewportTop, viewportLeft + viewportSize + 1, viewportTop + viewportSize, c);
     }
 
     private void renderGrid(GuiGraphics gg, MonitorBlockEntity monitor, IRadar radar) {
@@ -199,7 +219,7 @@ public class MonitorScreen extends Screen {
 
         RenderSystem.enableBlend();
         gg.setColor(color.getRedAsFloat(), color.getGreenAsFloat(), color.getBlueAsFloat(), alpha);
-        gg.blit(sprite.getTexture(), left, top, 0, 0, uiSize, uiSize, uiSize, uiSize);
+        gg.blit(sprite.getTexture(), left, top, 0, 0, uiSize, uiSize, RADAR_BG_TEXTURE_PX, RADAR_BG_TEXTURE_PX);
         gg.setColor(1f, 1f, 1f, 1f);
         RenderSystem.disableBlend();
     }
@@ -267,7 +287,7 @@ public class MonitorScreen extends Screen {
         gg.pose().mulPose(Axis.ZP.rotationDegrees(-screenAngle));
         gg.pose().translate(-cx, -cy, 0);
 
-        gg.blit(MonitorSprite.RADAR_SWEEP.getTexture(), left, top, 0, 0, uiSize, uiSize, uiSize, uiSize);
+        gg.blit(MonitorSprite.RADAR_SWEEP.getTexture(), left, top, 0, 0, uiSize, uiSize, RADAR_BG_TEXTURE_PX, RADAR_BG_TEXTURE_PX);
 
         gg.pose().popPose();
 
@@ -373,15 +393,15 @@ public class MonitorScreen extends Screen {
 
             RenderSystem.enableBlend();
             gg.setColor(c.getRedAsFloat(), c.getGreenAsFloat(), c.getBlueAsFloat(), alpha);
-            gg.blit(track.getSprite().getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, spriteSize, spriteSize);
+            gg.blit(track.getSprite().getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, TRACK_TEXTURE_PX, TRACK_TEXTURE_PX);
 
             if (track.id().equals(hoveredId)) {
                 gg.setColor(1f, 1f, 0f, alpha);
-                gg.blit(MonitorSprite.TARGET_HOVERED.getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, spriteSize, spriteSize);
+                gg.blit(MonitorSprite.TARGET_HOVERED.getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, TRACK_TEXTURE_PX, TRACK_TEXTURE_PX);
             }
             if (track.id().equals(monitor.selectedEntity)) {
                 gg.setColor(1f, 0f, 0f, alpha);
-                gg.blit(MonitorSprite.TARGET_SELECTED.getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, spriteSize, spriteSize);
+                gg.blit(MonitorSprite.TARGET_SELECTED.getTexture(), sx, sy, 0, 0, spriteSize, spriteSize, TRACK_TEXTURE_PX, TRACK_TEXTURE_PX);
             }
 
             gg.setColor(1f, 1f, 1f, 1f);
@@ -412,7 +432,7 @@ public class MonitorScreen extends Screen {
     }
 
     private void updateHoverFromMouse(MonitorBlockEntity monitor, IRadar radar, int mouseX, int mouseY) {
-        if (mouseX < left || mouseX >= left + uiSize || mouseY < top || mouseY >= top + uiSize) {
+        if (!isMouseOverRadar(mouseX, mouseY)) {
             hoveredId = null;
             return;
         }
@@ -462,6 +482,13 @@ public class MonitorScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if ((button == 1 || button == 2) && isMouseOverViewport((int) mouseX, (int) mouseY)) {
+            panning = true;
+            lastDragX = mouseX;
+            lastDragY = mouseY;
+            return true;
+        }
+
         if (button != 0)
             return super.mouseClicked(mouseX, mouseY, button);
 
@@ -485,7 +512,49 @@ public class MonitorScreen extends Screen {
     }
 
     private boolean isMouseOverRadar(int mx, int my) {
-        return mx >= left && mx < left + uiSize && my >= top && my < top + uiSize;
+        return isMouseOverViewport(mx, my) && mx >= left && mx < left + uiSize && my >= top && my < top + uiSize;
+    }
+
+    private boolean isMouseOverViewport(int mx, int my) {
+        return mx >= viewportLeft && mx < viewportLeft + viewportSize && my >= viewportTop && my < viewportTop + viewportSize;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (panning || button == 1 || button == 2) {
+            panX -= (int) Math.round(mouseX - lastDragX);
+            panY -= (int) Math.round(mouseY - lastDragY);
+            lastDragX = mouseX;
+            lastDragY = mouseY;
+            clampPan();
+            updateCanvasOrigin();
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (panning && (button == 1 || button == 2)) {
+            panning = false;
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        int oldX = panX;
+        int oldY = panY;
+        if (keyCode == GLFW.GLFW_KEY_LEFT) panX -= PAN_STEP;
+        else if (keyCode == GLFW.GLFW_KEY_RIGHT) panX += PAN_STEP;
+        else if (keyCode == GLFW.GLFW_KEY_UP) panY -= PAN_STEP;
+        else if (keyCode == GLFW.GLFW_KEY_DOWN) panY += PAN_STEP;
+        else return super.keyPressed(keyCode, scanCode, modifiers);
+
+        clampPan();
+        updateCanvasOrigin();
+        return oldX != panX || oldY != panY;
     }
 
     private MonitorBlockEntity getController() {

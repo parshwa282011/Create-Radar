@@ -309,7 +309,7 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
 
             CompoundTag g = new CompoundTag();
             g.putString("Dim", group.key.dim().location().toString());
-            g.put("FiltererPos", NbtUtils.writeBlockPos(group.key.filtererPos()));
+            g.put("FiltererPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.key.filtererPos()));
 
             g.put("Targeting", group.targetingTag);
             g.put("Identification", group.identificationTag);
@@ -320,26 +320,26 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
             if (!group.monitorEndpoints.isEmpty()) {
                 ListTag list = new ListTag();
                 for (BlockPos p : group.monitorEndpoints) {
-                    list.add(NbtUtils.writeBlockPos(p));
+                    list.add(com.happysg.radar.utils.NbtCompat.writeBlockPos(p));
                 }
                 g.put("MonitorEndpoints", list);
             }
 
             if (group.radarPos != null && group.radarKind != null) {
-                g.put("RadarPos", NbtUtils.writeBlockPos(group.radarPos));
+                g.put("RadarPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(group.radarPos));
                 g.putString("RadarKind", group.radarKind.name());
             }
 
             ListTag weapons = new ListTag();
-            for (BlockPos ep : group.weaponEndpoints) weapons.add(NbtUtils.writeBlockPos(ep));
+            for (BlockPos ep : group.weaponEndpoints) weapons.add(com.happysg.radar.utils.NbtCompat.writeBlockPos(ep));
             g.put("WeaponEndpoints", weapons);
 
             ListTag usedMounts = new ListTag();
-            for (BlockPos mp : group.usedWeaponMounts) usedMounts.add(NbtUtils.writeBlockPos(mp));
+            for (BlockPos mp : group.usedWeaponMounts) usedMounts.add(com.happysg.radar.utils.NbtCompat.writeBlockPos(mp));
             g.put("UsedWeaponMounts", usedMounts);
 
             ListTag links = new ListTag();
-            for (BlockPos lp : group.dataLinks) links.add(NbtUtils.writeBlockPos(lp));
+            for (BlockPos lp : group.dataLinks) links.add(com.happysg.radar.utils.NbtCompat.writeBlockPos(lp));
             g.put("DataLinks", links);
 
             groupsTag.add(g);
@@ -381,6 +381,7 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
     public Group getOrCreateGroup(ResourceKey<Level> dim, BlockPos filtererPos) {
         String k = key(dim, filtererPos);
         return groupsByFilterer.computeIfAbsent(k, _k -> {
+            LOGGER.warn("[RADAR-NET] create filter group filterer={} dim={}", filtererPos, dim.location());
             setDirty();
             return new Group(new FilterKey(dim, filtererPos));
         });
@@ -457,6 +458,8 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
 
         group.monitorEndpoints.add(controllerPos);
         endpointToFilterer.put(key(dim, controllerPos), filtererKey);
+        LOGGER.warn("[RADAR-NET] attach monitor filterer={} clicked={} stored={} monitors={}",
+                group.key.filtererPos(), clickedPos, controllerPos, group.monitorEndpoints);
 
         setDirty();
     }
@@ -470,6 +473,7 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
         group.radarKind = kind;
 
         endpointToFilterer.put(key(dim, radarPos), filtererKey);
+        LOGGER.warn("[RADAR-NET] attach radar filterer={} radar={} kind={}", group.key.filtererPos(), radarPos, kind);
 
         setDirty();
     }
@@ -485,6 +489,8 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
 
         // controller -> mount mapping
         controllerToWeaponMount.put(key(group.key.dim(), controllerPos), key(group.key.dim(), weaponMountPos));
+        LOGGER.warn("[RADAR-NET] attach weapon filterer={} controller={} mount={} endpoints={} mounts={}",
+                group.key.filtererPos(), controllerPos, weaponMountPos, group.weaponEndpoints, group.usedWeaponMounts);
 
         setDirty();
     }
@@ -494,6 +500,8 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
         group.dataLinks.add(dataLinkPos);
         dataLinkToFilterer.put(key(group.key.dim(), dataLinkPos), gk);
         dataLinkToEndpoint.put(key(group.key.dim(), dataLinkPos), key(group.key.dim(), endpointPos));
+        LOGGER.warn("[RADAR-NET] add datalink filterer={} link={} endpoint={} groupLinks={}",
+                group.key.filtererPos(), dataLinkPos, endpointPos, group.dataLinks);
         setDirty();
     }
     public void retargetEndpoint(ResourceKey<Level> dim, BlockPos oldEndpoint, BlockPos newEndpoint) {
@@ -546,6 +554,7 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
 
         String filtererKey = dataLinkToFilterer.remove(dlKey);
         String endpointKey = dataLinkToEndpoint.remove(dlKey);
+        LOGGER.warn("[RADAR-NET] remove datalink link={} owner={} endpoint={}", dataLinkPos, filtererKey, endpointKey);
 
         if (filtererKey == null) {
             setDirty();
@@ -653,6 +662,7 @@ public static BlockPos getFiltererPosFromGroupKey(@Nullable String filtererKey) 
 
         String endpointKey = key(dim, endpointPos);
         String filtererKey = endpointToFilterer.get(endpointKey);
+        LOGGER.warn("[RADAR-NET] endpoint removed endpoint={} owner={}", endpointPos, filtererKey);
         if (filtererKey == null) return;
 
         Group group = groupsByFilterer.get(filtererKey);

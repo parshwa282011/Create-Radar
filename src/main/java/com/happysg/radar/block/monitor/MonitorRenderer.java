@@ -171,8 +171,8 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
     private void renderLine(VertexConsumer buffer, Matrix4f matrix, Matrix3f normal,
                             float x1, float y1, float z1, float x2, float y2, float z2,
                             float r, float g, float b, float alpha) {
-        buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, alpha);
-        buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, alpha);
+        buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, alpha).setNormal(0, 1, 0);
+        buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, alpha).setNormal(0, 1, 0);
     }
 
     /**
@@ -204,6 +204,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u0, v0)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmax, DEPTH_GRID, zmin)
@@ -211,6 +212,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u1, v1)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmax, DEPTH_GRID, zmax)
@@ -218,6 +220,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u2, v2)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmin, DEPTH_GRID, zmax)
@@ -225,6 +228,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u3, v3)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
     }
 
@@ -408,6 +412,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u0, v0)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmax, depth, zmin)
@@ -415,6 +420,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u1, v1)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmax, depth, zmax)
@@ -422,6 +428,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u2, v2)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, xmin, depth, zmax)
@@ -429,6 +436,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u3, v3)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
     }
 
@@ -531,6 +539,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u0, v0)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, 1, DEPTH_SWEEP, 1f - size)
@@ -538,6 +547,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u1, v1)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, 1, DEPTH_SWEEP, 1f)
@@ -545,6 +555,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u2, v2)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
 
         buffer.addVertex(m, 1f - size, DEPTH_SWEEP, 1f)
@@ -552,6 +563,7 @@ public class MonitorRenderer extends SmartBlockEntityRenderer<MonitorBlockEntity
                 .setUv(u3, v3)
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(255)
+                .setNormal(0, 1, 0)
                 ;
     }
 

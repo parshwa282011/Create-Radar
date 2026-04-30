@@ -1,8 +1,6 @@
 package com.happysg.radar.compat.cbc;
 
 import com.happysg.radar.compat.Mods;
-import com.happysg.radar.mixin.AbstractCannonAccessor;
-import com.happysg.radar.mixin.AutoCannonAccessor;
 import com.happysg.radar.mixin.AutocannonProjectileAccessor;
 import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
@@ -40,6 +38,7 @@ import rbasamoyai.createbigcannons.munitions.autocannon.AbstractAutocannonProjec
 import net.arsenalists.createenergycannons.content.cannons.magnetic.railgun.MountedEnergyCannonContraption;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
@@ -63,10 +62,10 @@ public class CannonUtil {
         if (cannon == null)
             return 0;
         if(cannon.initialOrientation() == Direction.WEST || cannon.initialOrientation() == Direction.NORTH){
-            return ((AbstractCannonAccessor) cannon).getBackExtensionLength();
+            return getCannonExtensionLength(cannon, "backExtensionLength");
         }
         else{
-            return ((AbstractCannonAccessor) cannon).getFrontExtensionLength();
+            return getCannonExtensionLength(cannon, "frontExtensionLength");
         }
     }
     public static Vec3 getCannonMountOffset(Level level, BlockPos pos) {
@@ -217,7 +216,7 @@ public class CannonUtil {
         }
 
         try {
-            AutocannonMaterial mat = ((AutoCannonAccessor) cannon).getMaterial();
+            AutocannonMaterial mat = getAutocannonMaterial(cannon);
             if (mat != null) {
                 int t = mat.properties().projectileLifetime();
                 if (t > 0) return t;
@@ -366,7 +365,7 @@ public class CannonUtil {
     }
 
     private static float getAutoCannonSpeed(AbstractMountedCannonContraption cannon) {
-        AutocannonMaterial cann = ((AutoCannonAccessor) cannon).getMaterial();
+        AutocannonMaterial cann = getAutocannonMaterial(cannon);
         if (cann == null) return 0f;
         var props = cann.properties();
 
@@ -389,6 +388,37 @@ public class CannonUtil {
         }
 
         return speed;
+    }
+
+    private static AutocannonMaterial getAutocannonMaterial(AbstractMountedCannonContraption cannon) {
+        if (cannon == null) return null;
+        try {
+            Field field = MountedAutocannonContraption.class.getDeclaredField("cannonMaterial");
+            field.setAccessible(true);
+            Object value = field.get(cannon);
+            return value instanceof AutocannonMaterial material ? material : null;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            LOGGER.warn("[RADAR-CBC] Could not read autocannon material from {}: {}",
+                    cannon.getClass().getName(), e.toString());
+            return null;
+        }
+    }
+
+    private static int getCannonExtensionLength(AbstractMountedCannonContraption cannon, String fieldName) {
+        try {
+            Field field = AbstractMountedCannonContraption.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Object value = field.get(cannon);
+            if (value instanceof Number number) {
+                return Math.max(0, number.intValue());
+            }
+            LOGGER.warn("[RADAR-CBC] Cannon extension field {} on {} was not numeric: {}",
+                    fieldName, cannon.getClass().getName(), value);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            LOGGER.warn("[RADAR-CBC] Could not read cannon extension {} from {}: {}",
+                    fieldName, cannon.getClass().getName(), e.toString());
+        }
+        return 0;
     }
 
 

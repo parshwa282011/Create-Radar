@@ -34,7 +34,7 @@ public class GuidedFuzeItem extends FuzeItem {
         BlockPos clickedPos = pContext.getClickedPos();
         if (pContext.getLevel().getBlockEntity(clickedPos) instanceof NetworkFiltererBlockEntity blockEntity) {
             CompoundTag tag = com.happysg.radar.utils.NbtCompat.getOrCreateTag(pContext.getItemInHand());
-            tag.put("monitorPos", NbtUtils.writeBlockPos(blockEntity.getBlockPos()));
+            tag.put("monitorPos", com.happysg.radar.utils.NbtCompat.writeBlockPos(blockEntity.getBlockPos()));
             com.happysg.radar.utils.NbtCompat.setTag(pContext.getItemInHand(), tag);
             return InteractionResult.SUCCESS;
         }
